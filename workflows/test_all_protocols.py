@@ -30,6 +30,8 @@ import threading
 import time
 from pathlib import Path
 
+from simulated_panel import SS_CLIENT_PASSWORD
+
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -289,7 +291,7 @@ machine_id = {MACHINE_ID}
                 "--protocol", self.protocol,
                 "--listen", f"127.0.0.1:{client_port}",
                 "--server", f"127.0.0.1:{server_port}",
-                "--password", "test-password-1001",
+                "--password", SS_CLIENT_PASSWORD if self.protocol == "shadowsocks" else "test-password-1001",
                 "--sni", "node-test.local",
                 "--insecure",
             ]

@@ -27,6 +27,8 @@ import threading
 import time
 from pathlib import Path
 
+from simulated_panel import SS_CLIENT_PASSWORD
+
 ROOT = Path(os.environ.get("GITHUB_WORKSPACE", Path(__file__).resolve().parent.parent))
 AERION_DIR = Path(os.environ.get("AERION_DIR", ROOT.parent / "Aerion"))
 BIN_SUFFIX = ".exe" if sys.platform == "win32" else ""
@@ -464,7 +466,7 @@ class MihomoProtocolTester:
             # 6. Mihomo config
             self.mixed_port = free_port()
             self.socks_port = free_port()
-            pw = "vaR5nc1yDpQ707N7bRV2aA==" if self.protocol == "shadowsocks" else DEFAULT_PASSWORD
+            pw = SS_CLIENT_PASSWORD if self.protocol == "shadowsocks" else DEFAULT_PASSWORD
             uuid_val = DEFAULT_UUID
 
             # SS UDP via mihomo Alpha panics in sing-shadowsocks2 v0.2.7 read-waiter

@@ -2,6 +2,7 @@
 """Simulated Xboard Panel for testing NodeRS protocol implementations."""
 
 import argparse
+import base64
 import json
 import os
 import signal
@@ -11,6 +12,8 @@ import time
 import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+
+SS_SERVER_KEY = "vaR5nc1yDpQ707N7bRV2aA=="
 
 
 def self_signed_cert_config():
@@ -78,7 +81,7 @@ PROTOCOL_CONFIGS = {
     "shadowsocks": lambda port: base_node_config(
         "shadowsocks", port,
         {"network": "tcp,udp", "cipher": "2022-blake3-aes-128-gcm",
-         "server_key": "vaR5nc1yDpQ707N7bRV2aA==",
+         "server_key": SS_SERVER_KEY,
          "tls": None, "tls_settings": None,
          "reality_settings": None, "cert_config": None,
          "udp_relay_mode": "native"}),
@@ -124,11 +127,12 @@ DEFAULT_USERS = [
      "password": "test-password-1002", "alter_id": 0, "speed_limit": 0, "device_limit": 0},
 ]
 
-# Shadowsocks 2022 user PSK keys (base64-encoded 16-byte keys)
+# Match Xboard's UUID-derived AES-128 user keys.
 SS_USER_KEYS = {
-    1001: "vaR5nc1yDpQ707N7bRV2aA==",
-    1002: "vaR5nc1yDpQ707N7bRV2aA==",
+    user["id"]: base64.b64encode(user["uuid"].encode()[:16]).decode()
+    for user in DEFAULT_USERS
 }
+SS_CLIENT_PASSWORD = f"{SS_SERVER_KEY}:{SS_USER_KEYS[1001]}"
 
 
 class PanelHandler(BaseHTTPRequestHandler):
@@ -172,10 +176,11 @@ class PanelHandler(BaseHTTPRequestHandler):
                 self._send_json(200, cfg)
             elif path == "/api/v2/server/user":
                 if self.server.protocol == "shadowsocks":
-                    # Shadowsocks 2022 multi-user TCP requires crate feature; test with 1 user
-                    u = dict(DEFAULT_USERS[0])
-                    u["password"] = SS_USER_KEYS.get(u["id"], u["password"])
-                    self._send_json(200, {"users": [u]})
+                    if not self.server.cipher or self.server.cipher.startswith("2022-"):
+                        users = [{**user, "password": ""} for user in DEFAULT_USERS]
+                    else:
+                        users = [DEFAULT_USERS[0]]
+                    self._send_json(200, {"users": users})
                 else:
                     self._send_json(200, {"users": DEFAULT_USERS})
             elif path == "/api/v2/server/report":

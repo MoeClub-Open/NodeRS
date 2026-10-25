@@ -219,7 +219,7 @@ fn builds_shadowsocks_2022_udp_multi_user_config() {
 }
 
 #[test]
-fn rejects_shadowsocks_tcp_multi_user_accounting_gap() {
+fn builds_shadowsocks_2022_tcp_multi_user_config() {
     let remote = NodeConfigResponse {
         listen_ip: "127.0.0.1".to_string(),
         server_port: 8388,
@@ -240,11 +240,88 @@ fn rejects_shadowsocks_tcp_multi_user_accounting_gap() {
         },
     ];
 
-    let error = match shadowsocks::build_config(&remote, &users) {
-        Ok(_) => panic!("tcp multi-user should fail"),
-        Err(error) => error,
+    let BuiltServerConfig::Shadowsocks(config) =
+        shadowsocks::build_config(&remote, &users).expect("build TCP multi-user config")
+    else {
+        panic!("expected Shadowsocks config");
     };
-    assert!(error.to_string().contains("TCP multi-user accounting"));
+    assert!(config.tcp);
+    assert!(config.udp);
+    assert_eq!(config.users.len(), 2);
+}
+
+#[test]
+fn shadowsocks_2022_uuid_keys_stay_stable_when_user_count_changes() {
+    for (cipher, server_key, user_key) in [
+        (
+            "2022-blake3-aes-128-gcm",
+            "QUJDREVGR0hJSktMTU5PUA==",
+            "YTM0ODJlODgtNjg2YS00YQ==",
+        ),
+        (
+            "2022-blake3-aes-256-gcm",
+            "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU=",
+            "YTM0ODJlODgtNjg2YS00YTU4LTgxMjYtOTljOWRmNjQ=",
+        ),
+    ] {
+        let remote = NodeConfigResponse {
+            server_port: 8388,
+            cipher: cipher.into(),
+            server_key: server_key.into(),
+            ..Default::default()
+        };
+        let users = vec![
+            PanelUser {
+                id: 1001,
+                uuid: "a3482e88-686a-4a58-8126-99c9df64b7bf".into(),
+                speed_limit: 10,
+                device_limit: 2,
+                ..Default::default()
+            },
+            PanelUser {
+                id: 1002,
+                uuid: "b4593f99-797b-5b69-9237-aa0de075c8cf".into(),
+                ..Default::default()
+            },
+        ];
+        for active in [&users[..], &users[..1]] {
+            let BuiltServerConfig::Shadowsocks(config) =
+                shadowsocks::build_config(&remote, active).expect("build UUID config")
+            else {
+                panic!("expected Shadowsocks config");
+            };
+            assert_eq!(config.password, server_key);
+            assert_eq!(config.users[0], format!("1001:{user_key}"));
+            let core_users = shadowsocks::core_users(&remote, active).expect("core UUID users");
+            assert_eq!(core_users[0].credential, user_key);
+            assert_eq!(core_users[0].upload_limit_bps, Some(1_250_000));
+            assert_eq!(core_users[0].max_online_ips, Some(2));
+        }
+        assert!(shadowsocks::core_users(&remote, &[]).unwrap().is_empty());
+    }
+}
+
+#[test]
+fn shadowsocks_2022_chacha_uses_single_user_key_without_server_key() {
+    let remote = NodeConfigResponse {
+        server_port: 8388,
+        cipher: "2022-blake3-chacha20-poly1305".into(),
+        ..Default::default()
+    };
+    let user = PanelUser {
+        id: 1001,
+        password: "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVowMTIzNDU=".into(),
+        ..Default::default()
+    };
+    let BuiltServerConfig::Shadowsocks(config) =
+        shadowsocks::build_config(&remote, std::slice::from_ref(&user)).unwrap()
+    else {
+        panic!("expected Shadowsocks config");
+    };
+    assert_eq!(config.password, user.password);
+    assert!(config.users.is_empty());
+    assert!(shadowsocks::build_config(&remote, &[user.clone(), user]).is_err());
+    assert!(shadowsocks::core_users(&remote, &[]).unwrap().is_empty());
 }
 
 #[test]
