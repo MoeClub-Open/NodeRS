@@ -2,6 +2,7 @@
 """Simulated Xboard Panel for testing NodeRS protocol implementations."""
 
 import argparse
+import base64
 import json
 import os
 import signal
@@ -11,6 +12,19 @@ import time
 import uuid
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
+
+SS_CIPHER = os.environ.get("SS_CIPHER", "2022-blake3-aes-128-gcm")
+
+
+def ss_server_key(cipher):
+    if cipher == "2022-blake3-aes-128-gcm":
+        return "vaR5nc1yDpQ707N7bRV2aA=="
+    if cipher == "2022-blake3-aes-256-gcm":
+        return base64.b64encode(b"0123456789abcdef0123456789abcdef").decode()
+    return ""
+
+
+SS_SERVER_KEY = ss_server_key(SS_CIPHER)
 
 
 def self_signed_cert_config():
@@ -77,8 +91,8 @@ def base_node_config(protocol, server_port, extra=None):
 PROTOCOL_CONFIGS = {
     "shadowsocks": lambda port: base_node_config(
         "shadowsocks", port,
-        {"network": "tcp,udp", "cipher": "2022-blake3-aes-128-gcm",
-         "server_key": "vaR5nc1yDpQ707N7bRV2aA==",
+        {"network": "tcp,udp", "cipher": SS_CIPHER,
+         "server_key": SS_SERVER_KEY,
          "tls": None, "tls_settings": None,
          "reality_settings": None, "cert_config": None,
          "udp_relay_mode": "native"}),
@@ -124,11 +138,15 @@ DEFAULT_USERS = [
      "password": "test-password-1002", "alter_id": 0, "speed_limit": 0, "device_limit": 0},
 ]
 
-# Shadowsocks 2022 user PSK keys (base64-encoded 16-byte keys)
+# Match Xboard's UUID-derived user keys.
 SS_USER_KEYS = {
-    1001: "vaR5nc1yDpQ707N7bRV2aA==",
-    1002: "vaR5nc1yDpQ707N7bRV2aA==",
+    user["id"]: base64.b64encode(user["uuid"].encode()[:16 if SS_CIPHER == "2022-blake3-aes-128-gcm" else 32]).decode()
+    for user in DEFAULT_USERS
 }
+SS_CLIENT_PASSWORD = (
+    SS_USER_KEYS[1001] if SS_CIPHER == "2022-blake3-chacha20-poly1305"
+    else f"{SS_SERVER_KEY}:{SS_USER_KEYS[1001]}"
+)
 
 
 class PanelHandler(BaseHTTPRequestHandler):
@@ -172,10 +190,11 @@ class PanelHandler(BaseHTTPRequestHandler):
                 self._send_json(200, cfg)
             elif path == "/api/v2/server/user":
                 if self.server.protocol == "shadowsocks":
-                    # Shadowsocks 2022 multi-user TCP requires crate feature; test with 1 user
-                    u = dict(DEFAULT_USERS[0])
-                    u["password"] = SS_USER_KEYS.get(u["id"], u["password"])
-                    self._send_json(200, {"users": [u]})
+                    if (self.server.cipher or SS_CIPHER).startswith("2022-"):
+                        users = [{**user, "password": ""} for user in DEFAULT_USERS]
+                    else:
+                        users = [DEFAULT_USERS[0]]
+                    self._send_json(200, {"users": users})
                 else:
                     self._send_json(200, {"users": DEFAULT_USERS})
             elif path == "/api/v2/server/report":
@@ -192,12 +211,10 @@ class PanelHandler(BaseHTTPRequestHandler):
         if proto not in PROTOCOL_CONFIGS:
             return {"error": f"unknown protocol: {proto}"}
         cfg = PROTOCOL_CONFIGS[proto](port)
-        # Apply cipher override (for mihomo SS2022->legacy fallback)
-        if self.server.cipher and self.server.cipher not in ("", "2022-blake3-aes-128-gcm"):
+        if self.server.cipher:
             cfg["cipher"] = self.server.cipher
-            # Switch to plaintext password for legacy SS (vs SS2022 base64 key)
             if proto == "shadowsocks":
-                cfg["server_key"] = "test-password-1001"
+                cfg["server_key"] = ss_server_key(self.server.cipher)
         self.server.last_built_port = port
         return cfg
 

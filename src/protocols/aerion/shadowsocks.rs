@@ -12,7 +12,7 @@ enum ShadowsocksCipher {
     Legacy,
     Aead2022 {
         key_len: usize,
-        supports_multi_user: bool,
+        uses_server_key: bool,
     },
 }
 
@@ -40,10 +40,6 @@ pub(super) fn build_config(
     let cipher = parse_cipher(remote)?;
     let networks = parse_networks(&remote.network, cipher)?;
     let materials = user_materials(cipher, remote, users)?;
-    ensure!(
-        !(networks.tcp && !materials.server_users.is_empty()),
-        "Aerion Shadowsocks TCP multi-user accounting requires authenticated user exposure from the shadowsocks crate"
-    );
 
     Ok(BuiltServerConfig::Shadowsocks(
         ::aerion::ShadowsocksServerConfig {
@@ -62,6 +58,9 @@ pub(super) fn core_users(
     remote: &NodeConfigResponse,
     users: &[PanelUser],
 ) -> anyhow::Result<Vec<::aerion::core::CoreUser>> {
+    if users.is_empty() {
+        return Ok(Vec::new());
+    }
     let cipher = parse_cipher(remote)?;
     let materials = user_materials(cipher, remote, users)?;
     Ok(materials
@@ -138,15 +137,15 @@ fn parse_cipher(remote: &NodeConfigResponse) -> anyhow::Result<ShadowsocksCipher
         | "aeadxchacha20ietfpoly1305" => ShadowsocksCipher::Legacy,
         "2022blake3aes128gcm" => ShadowsocksCipher::Aead2022 {
             key_len: 16,
-            supports_multi_user: true,
+            uses_server_key: true,
         },
         "2022blake3aes256gcm" => ShadowsocksCipher::Aead2022 {
             key_len: 32,
-            supports_multi_user: true,
+            uses_server_key: true,
         },
         "2022blake3chacha20poly1305" => ShadowsocksCipher::Aead2022 {
             key_len: 32,
-            supports_multi_user: false,
+            uses_server_key: false,
         },
         _ => bail!("unsupported Shadowsocks cipher {}", remote.cipher.trim()),
     })
@@ -254,28 +253,22 @@ fn user_materials<'a>(
         }
         ShadowsocksCipher::Aead2022 {
             key_len,
-            supports_multi_user,
+            uses_server_key,
         } => {
-            let password = normalize_psk(
-                &remote.server_key,
-                key_len,
-                "decode Shadowsocks 2022 server_key",
-            )?;
-            if users.len() == 1 {
-                return Ok(ShadowsocksMaterials {
-                    password: password.clone(),
-                    server_users: Vec::new(),
-                    core_users: vec![UserMaterial {
-                        user: &users[0],
-                        credential: password,
-                    }],
-                });
-            }
-
-            ensure!(
-                supports_multi_user,
-                "Shadowsocks 2022 chacha20-poly1305 does not support multi-user"
-            );
+            let password = if uses_server_key {
+                normalize_psk(
+                    &remote.server_key,
+                    key_len,
+                    "decode Shadowsocks 2022 server_key",
+                )?
+            } else {
+                shadowsocks_2022_user_key(
+                    users
+                        .first()
+                        .context("Shadowsocks 2022 node has no users")?,
+                    key_len,
+                )?
+            };
             let mut server_users = Vec::with_capacity(users.len());
             let mut core_users = Vec::with_capacity(users.len());
             for user in users {
@@ -304,11 +297,19 @@ fn shadowsocks_2022_user_key(user: &PanelUser, key_len: usize) -> anyhow::Result
         );
     }
     if !user.uuid.trim().is_empty() {
-        return normalize_psk(
-            &user.uuid,
-            key_len,
-            &format!("decode Shadowsocks 2022 user {} key", user.id),
-        );
+        // Match Xboard Helper::uuidToBase64, including UUID hyphens.
+        let key = user
+            .uuid
+            .trim()
+            .as_bytes()
+            .get(..key_len)
+            .with_context(|| {
+                format!(
+                    "Shadowsocks 2022 user {} UUID must contain at least {key_len} bytes",
+                    user.id
+                )
+            })?;
+        return Ok(STANDARD.encode(key));
     }
     bail!("Shadowsocks 2022 user {} is missing password/uuid", user.id)
 }

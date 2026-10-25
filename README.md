@@ -35,6 +35,8 @@ NodeRS 是跑在 Linux 上的 [Xboard](https://github.com/cedar2025/Xboard) 节�
 
 协议能力边界见 [Aerion 文档](https://github.com/MoeclubM/Aerion)。
 
+SS-2022 的 AES-128、AES-256 和 ChaCha20 均支持 TCP、UDP 和 UoT 多用户，按用户统计流量并执行限速、设备数限制。用户密钥优先使用面板下发的 Base64 `password`；只下发 UUID 时，按 Xboard 规则取 UUID 前 16/32 字节后进行 Base64 编码。AES 节点始终使用 `server_key:用户密钥` 连接，ChaCha20 使用独立用户密钥连接，用户数量变化不会改变密钥格式。
+
 ## 快速开始
 
 在 Xboard 里创建机器，记下机器 ID 和机器密钥，把节点挂到这台机器上并配好端口、协议、证书，然后在服务器上执行：
