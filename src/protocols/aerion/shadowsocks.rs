@@ -12,7 +12,7 @@ enum ShadowsocksCipher {
     Legacy,
     Aead2022 {
         key_len: usize,
-        supports_multi_user: bool,
+        uses_server_key: bool,
     },
 }
 
@@ -137,15 +137,15 @@ fn parse_cipher(remote: &NodeConfigResponse) -> anyhow::Result<ShadowsocksCipher
         | "aeadxchacha20ietfpoly1305" => ShadowsocksCipher::Legacy,
         "2022blake3aes128gcm" => ShadowsocksCipher::Aead2022 {
             key_len: 16,
-            supports_multi_user: true,
+            uses_server_key: true,
         },
         "2022blake3aes256gcm" => ShadowsocksCipher::Aead2022 {
             key_len: 32,
-            supports_multi_user: true,
+            uses_server_key: true,
         },
         "2022blake3chacha20poly1305" => ShadowsocksCipher::Aead2022 {
             key_len: 32,
-            supports_multi_user: false,
+            uses_server_key: false,
         },
         _ => bail!("unsupported Shadowsocks cipher {}", remote.cipher.trim()),
     })
@@ -253,29 +253,22 @@ fn user_materials<'a>(
         }
         ShadowsocksCipher::Aead2022 {
             key_len,
-            supports_multi_user,
+            uses_server_key,
         } => {
-            if !supports_multi_user {
-                ensure!(
-                    users.len() == 1,
-                    "Shadowsocks 2022 chacha20-poly1305 does not support multi-user"
-                );
-                let password = shadowsocks_2022_user_key(&users[0], key_len)?;
-                return Ok(ShadowsocksMaterials {
-                    password: password.clone(),
-                    server_users: Vec::new(),
-                    core_users: vec![UserMaterial {
-                        user: &users[0],
-                        credential: password,
-                    }],
-                });
-            }
-
-            let password = normalize_psk(
-                &remote.server_key,
-                key_len,
-                "decode Shadowsocks 2022 server_key",
-            )?;
+            let password = if uses_server_key {
+                normalize_psk(
+                    &remote.server_key,
+                    key_len,
+                    "decode Shadowsocks 2022 server_key",
+                )?
+            } else {
+                shadowsocks_2022_user_key(
+                    users
+                        .first()
+                        .context("Shadowsocks 2022 node has no users")?,
+                    key_len,
+                )?
+            };
             let mut server_users = Vec::with_capacity(users.len());
             let mut core_users = Vec::with_capacity(users.len());
             for user in users {

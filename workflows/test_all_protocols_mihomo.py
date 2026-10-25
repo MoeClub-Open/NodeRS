@@ -27,7 +27,7 @@ import threading
 import time
 from pathlib import Path
 
-from simulated_panel import SS_CLIENT_PASSWORD
+from simulated_panel import SS_CIPHER, SS_CLIENT_PASSWORD
 
 ROOT = Path(os.environ.get("GITHUB_WORKSPACE", Path(__file__).resolve().parent.parent))
 AERION_DIR = Path(os.environ.get("AERION_DIR", ROOT.parent / "Aerion"))
@@ -312,7 +312,7 @@ def generate_mihomo_config(protocol, server_port, password, uuid_val, mixed_port
     if protocol == "shadowsocks":
         proxy.update({
             "type": "ss", "server": "127.0.0.1", "port": server_port,
-            "cipher": "2022-blake3-aes-128-gcm",
+            "cipher": SS_CIPHER,
             "password": password, "udp": True,
         })
     elif protocol == "hysteria2":
@@ -480,7 +480,7 @@ class MihomoProtocolTester:
                     f.write(f'listen = "127.0.0.1:{self.mixed_port}"\n')
                     f.write(f'server = "127.0.0.1:{server_port}"\n')
                     f.write(f'password = "{pw}"\n')
-                    f.write('security = "2022-blake3-aes-128-gcm"\n')
+                    f.write(f'security = "{SS_CIPHER}"\n')
                     f.write("udp = true\n")
                 self.mihomo_proc = run_in_background(
                     [str(self.aerion_bin), "run", "--config", aerion_toml],

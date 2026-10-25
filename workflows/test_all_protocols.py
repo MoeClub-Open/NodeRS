@@ -30,7 +30,7 @@ import threading
 import time
 from pathlib import Path
 
-from simulated_panel import SS_CLIENT_PASSWORD
+from simulated_panel import SS_CIPHER, SS_CLIENT_PASSWORD
 
 
 # ---------------------------------------------------------------------------
@@ -296,7 +296,7 @@ machine_id = {MACHINE_ID}
                 "--insecure",
             ]
             if self.protocol == "shadowsocks":
-                args += ["--method", "2022-blake3-aes-128-gcm"]
+                args += ["--method", SS_CIPHER]
         elif subcmd == "hysteria2-client":
             args += [
                 "--listen", f"127.0.0.1:{client_port}",
