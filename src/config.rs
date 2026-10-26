@@ -17,11 +17,21 @@ impl AppConfig {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct PanelConfig {
+    #[serde(default, rename = "type")]
+    pub panel_type: PanelType,
     #[serde(alias = "url")]
     pub api: String,
     #[serde(alias = "token")]
     pub key: String,
     pub machine_id: i64,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PanelType {
+    #[default]
+    Xboard,
+    Pxboard,
 }
 
 #[cfg(test)]

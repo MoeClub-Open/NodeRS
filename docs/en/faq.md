@@ -53,4 +53,4 @@ Legacy service names `noders-anytls` and `noders-<machine_id>` are migrated to `
 
 Linux only: `x86_64` / `aarch64` with glibc 2.36+ or musl. Both systemd and OpenRC have install scripts. Windows and macOS are not supported.
 
-Still stuck? Check the [Aerion docs](https://github.com/MoeclubM/Aerion) for protocol-level limits, or ask in the [GitHub Issues](https://github.com/MoeclubM/NodeRS/issues).
+Still stuck? Check the [Aerion docs](https://github.com/MoeclubM/Aerion) for protocol-level limits, or ask in the [GitHub Issues](https://github.com/MoeClub-Open/NodeRS/issues).

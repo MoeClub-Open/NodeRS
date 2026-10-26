@@ -4,6 +4,7 @@ mod config;
 mod logging;
 mod panel;
 mod protocols;
+mod pxboard;
 mod runtime;
 mod status;
 mod ws;
@@ -14,6 +15,10 @@ use std::path::PathBuf;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let argument = std::env::args().nth(1);
+    if argument.as_deref() == Some("--supported-panels") {
+        println!("xboard pxboard");
+        return Ok(());
+    }
     if matches!(argument.as_deref(), Some("--version" | "-V")) {
         println!("noders {}", env!("CARGO_PKG_VERSION"));
         return Ok(());

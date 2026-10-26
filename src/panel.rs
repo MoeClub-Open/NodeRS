@@ -5,7 +5,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Duration;
 
-use crate::config::PanelConfig;
+use crate::config::{PanelConfig, PanelType};
+use crate::pxboard::PxBoardClient;
 
 mod cert;
 
@@ -25,6 +26,7 @@ pub struct MachinePanelClient {
     base_url: String,
     token: String,
     machine_id: i64,
+    pxboard: Option<PxBoardClient>,
 }
 
 #[derive(Clone)]
@@ -608,6 +610,11 @@ impl MachinePanelClient {
             base_url: config.api.trim_end_matches('/').to_string(),
             token: config.key.clone(),
             machine_id: config.machine_id,
+            pxboard: if config.panel_type == PanelType::Pxboard {
+                Some(PxBoardClient::new(config)?)
+            } else {
+                None
+            },
         })
     }
 
@@ -648,6 +655,10 @@ impl MachinePanelClient {
     }
 
     pub async fn fetch_handshake(&self) -> anyhow::Result<HandshakeResponse> {
+        if let Some(panel) = &self.pxboard {
+            panel.handshake().await?;
+            return Ok(HandshakeResponse::default());
+        }
         let response = self
             .client
             .post(self.url("/api/v2/server/handshake"))
@@ -660,6 +671,9 @@ impl MachinePanelClient {
     }
 
     pub async fn fetch_machine_nodes(&self) -> anyhow::Result<MachineNodesResponse> {
+        if let Some(panel) = &self.pxboard {
+            return panel.nodes().await;
+        }
         let response = self
             .client
             .post(self.url("/api/v2/server/machine/nodes"))
@@ -672,6 +686,9 @@ impl MachinePanelClient {
     }
 
     pub async fn report_machine_status(&self, payload: &StatusPayload) -> anyhow::Result<()> {
+        if let Some(panel) = &self.pxboard {
+            return panel.status(None, payload).await;
+        }
         let response = self
             .client
             .post(self.url("/api/v2/server/machine/status"))
@@ -700,6 +717,12 @@ impl NodePanelClient {
         &self,
         etag: Option<&str>,
     ) -> anyhow::Result<FetchState<NodeConfigResponse>> {
+        if let Some(panel) = &self.machine.pxboard {
+            return Ok(FetchState::Modified(
+                panel.config(self.node_id).await?,
+                None,
+            ));
+        }
         self.fetch_etag("/api/v2/server/config", etag).await
     }
 
@@ -707,6 +730,9 @@ impl NodePanelClient {
         &self,
         etag: Option<&str>,
     ) -> anyhow::Result<FetchState<UsersResponse>> {
+        if let Some(panel) = &self.machine.pxboard {
+            return Ok(FetchState::Modified(panel.users(self.node_id).await?, None));
+        }
         self.fetch_etag("/api/v2/server/user", etag).await
     }
 
@@ -714,6 +740,9 @@ impl NodePanelClient {
         &self,
         traffic: HashMap<i64, [u64; 2]>,
     ) -> Result<(), TrafficReportError> {
+        if let Some(panel) = &self.machine.pxboard {
+            return panel.traffic(self.node_id, traffic).await;
+        }
         if traffic.is_empty() {
             return Ok(());
         }
@@ -735,6 +764,9 @@ impl NodePanelClient {
     }
 
     pub async fn report_alive(&self, alive: HashMap<i64, Vec<String>>) -> anyhow::Result<()> {
+        if let Some(panel) = &self.machine.pxboard {
+            return panel.alive(self.node_id, alive).await;
+        }
         if alive.is_empty() {
             return Ok(());
         }
@@ -756,6 +788,9 @@ impl NodePanelClient {
     }
 
     pub async fn report_status(&self, payload: &StatusPayload) -> anyhow::Result<()> {
+        if let Some(panel) = &self.machine.pxboard {
+            return panel.status(Some(self.node_id), payload).await;
+        }
         let payload = ReportPayload {
             traffic: None,
             alive: None,

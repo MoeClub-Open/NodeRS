@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="MoeclubM/NodeRS"
+REPOSITORY="${NODERS_REPOSITORY:-MoeClub-Open/NodeRS}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 COMMON_LIB_PATH="$SCRIPT_DIR/lib/install-common.sh"
 PREFIX="/usr/local"
@@ -50,6 +50,9 @@ Options:
   --config-dir <path>   Config directory, default: /etc/noders/anytls
   --no-restart          Replace the binary but do not restart services
   -h, --help            Show this help message
+
+Environment:
+  NODERS_REPOSITORY     Release repository, default: MoeClub-Open/NodeRS
 
 Examples:
   bash upgrade.sh
@@ -654,6 +657,7 @@ refresh_openrc_unit_scripts() {
 install_from_bundle() {
   local staging_dir runtime_binary
   staging_dir="$1"
+  validate_bundle_panels "$staging_dir"
   runtime_binary="$(runtime_binary_path)"
 
   install -d "$PREFIX/bin"

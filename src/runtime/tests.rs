@@ -22,6 +22,7 @@ async fn wait_for_listener(port: u16) -> anyhow::Result<TcpStream> {
 async fn identical_config_replay_preserves_live_sudoku_connection() -> anyhow::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     let panel = MachinePanelClient::new(&crate::config::PanelConfig {
+        panel_type: Default::default(),
         api: "http://127.0.0.1:1".into(),
         key: "unused-local-test-key".into(),
         machine_id: 1,

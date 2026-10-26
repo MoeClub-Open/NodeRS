@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="MoeclubM/NodeRS"
+REPOSITORY="${NODERS_REPOSITORY:-MoeClub-Open/NodeRS}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 COMMON_LIB_PATH="$SCRIPT_DIR/lib/install-common.sh"
 PREFIX="/usr/local"
@@ -14,6 +14,7 @@ VERSION="latest"
 NO_SERVICE=0
 UNINSTALL=0
 REMOVE_ALL=0
+PANEL_TYPE="xboard"
 PANEL_API=""
 PANEL_KEY=""
 PANEL_MACHINE_ID=""
@@ -54,14 +55,18 @@ Options:
   --prefix <path>             Binary installation prefix, default: /usr/local
   --config-dir <path>         Config directory, default: /etc/noders/anytls
   --state-dir <path>          Working directory, default: /var/lib/noders/anytls
-  --api <url>                 Xboard API address
-  --key <token>               Xboard machine key
-  --machine-id <id>           Xboard machine id; with --uninstall it removes all local instances for that machine id
-  --machine <url> <key> <id>  Add one Xboard machine triplet; may be repeated; with --uninstall it removes the exact instance
+  --panel-type <type>         Panel type: xboard (default) or pxboard
+  --api <url>                 Panel API address
+  --key <token>               Panel machine key
+  --machine-id <id>           Panel machine id; with --uninstall it removes all local instances for that machine id
+  --machine <url> <key> <id>  Add one panel machine triplet; may be repeated; with --uninstall it removes the exact instance
   --uninstall                 Remove installed service(s), binary, and related files
   --all                       Used with --uninstall to remove all nodes and all data
   --no-service                Skip service installation
   -h, --help                  Show this help message
+
+Environment:
+  NODERS_REPOSITORY           Release repository, default: MoeClub-Open/NodeRS
 
 Examples:
   bash install.sh --api https://api.example.com --key token --machine-id 1
@@ -298,7 +303,7 @@ render_service_file() {
 }
 
 install_service() {
-  local staging_dir spec panel_api machine_id instance_id config_path unit_path service_unit
+  local staging_dir spec panel_api machine_id instance_id config_path unit_path service_unit spec_panel_type
   staging_dir="$1"
   [[ "$NO_SERVICE" -eq 0 ]] || return 0
   if [[ "$(id -u)" -ne 0 ]]; then
@@ -316,14 +321,16 @@ install_service() {
   chown -R "$SERVICE_USER":"$SERVICE_USER" "$STATE_DIR" "$CONFIG_DIR"
 
   for spec in "${XBOARD_SPECS[@]}"; do
-    IFS='|' read -r panel_api _ machine_id <<<"$spec"
-    instance_id="$(machine_instance_id "$panel_api" "$machine_id")"
+    IFS='|' read -r panel_api _ machine_id spec_panel_type <<<"$spec"
+    instance_id="$(machine_instance_id "$panel_api" "$machine_id" "${spec_panel_type:-xboard}")"
     config_path="$(node_config_path "$instance_id")"
     service_unit="${SERVICE_NAME}-${instance_id}"
-    stop_disable_unit "${SERVICE_NAME}-${machine_id}"
-    if [[ "$LEGACY_SERVICE_NAME" != "$SERVICE_NAME" ]]; then
-      stop_disable_unit "${LEGACY_SERVICE_NAME}-${machine_id}"
-      stop_disable_unit "${LEGACY_SERVICE_NAME}-${instance_id}"
+    if [[ "${spec_panel_type:-xboard}" == "xboard" ]]; then
+      stop_disable_unit "${SERVICE_NAME}-${machine_id}"
+      if [[ "$LEGACY_SERVICE_NAME" != "$SERVICE_NAME" ]]; then
+        stop_disable_unit "${LEGACY_SERVICE_NAME}-${machine_id}"
+        stop_disable_unit "${LEGACY_SERVICE_NAME}-${instance_id}"
+      fi
     fi
     unit_path="/etc/systemd/system/${service_unit}.service"
     render_service_file "$staging_dir" "$unit_path" "$config_path"
@@ -353,7 +360,7 @@ remove_single_node() {
   config_path="$(node_config_path "$instance_id")"
 
   stop_disable_unit "${SERVICE_NAME}-${instance_id}"
-  if [[ -n "$machine_id" ]]; then
+  if [[ -n "$machine_id" && "$instance_id" != pxboard-* ]]; then
     stop_disable_unit "${SERVICE_NAME}-${machine_id}"
     if [[ "$LEGACY_SERVICE_NAME" != "$SERVICE_NAME" ]]; then
       stop_disable_unit "${LEGACY_SERVICE_NAME}-${machine_id}"
@@ -367,6 +374,7 @@ remove_single_node() {
 remove_machine_instances() {
   local machine_id unit_path unit_name config_path
   machine_id="$1"
+  if [[ "${PANEL_TYPE:-xboard}" == "pxboard" ]]; then machine_id="pxboard-$machine_id"; fi
 
   if command -v systemctl >/dev/null 2>&1; then
     shopt -s nullglob
@@ -415,7 +423,7 @@ remove_all_nodes() {
 }
 
 uninstall() {
-  local spec panel_api machine_id instance_id skip_machine_id spec_machine_id
+  local spec panel_api machine_id instance_id skip_machine_id spec_machine_id spec_panel_type
   require_linux
 
   if [[ "$REMOVE_ALL" -eq 1 || (${#TARGET_MACHINE_IDS[@]} -eq 0 && ${#XBOARD_SPECS[@]} -eq 0) ]]; then
@@ -425,8 +433,8 @@ uninstall() {
   fi
 
   for spec in "${XBOARD_SPECS[@]}"; do
-    IFS='|' read -r panel_api _ machine_id <<<"$spec"
-    instance_id="$(machine_instance_id "$panel_api" "$machine_id")"
+    IFS='|' read -r panel_api _ machine_id spec_panel_type <<<"$spec"
+    instance_id="$(machine_instance_id "$panel_api" "$machine_id" "${spec_panel_type:-xboard}")"
     remove_single_node "$instance_id" "$machine_id"
     echo "Removed machine ${machine_id} instance ${instance_id}."
   done
@@ -434,7 +442,7 @@ uninstall() {
   for machine_id in "${TARGET_MACHINE_IDS[@]}"; do
     skip_machine_id=0
     for spec in "${XBOARD_SPECS[@]}"; do
-      IFS='|' read -r _ _ spec_machine_id <<<"$spec"
+      IFS='|' read -r _ _ spec_machine_id spec_panel_type <<<"$spec"
       if [[ "$spec_machine_id" == "$machine_id" ]]; then
         skip_machine_id=1
         break
@@ -471,6 +479,8 @@ EOF
 install_from_bundle() {
   local staging_dir
   staging_dir="$1"
+
+  validate_bundle_panels "$staging_dir"
 
   ensure_directories
   install_management_support "$staging_dir"

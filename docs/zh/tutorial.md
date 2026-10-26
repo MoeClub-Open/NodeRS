@@ -28,7 +28,7 @@
 在节点机上执行（把 `https://api.example.com` 换成面板 API 地址，`机器密钥` 换成第 1 步拿到的密钥）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key 机器密钥 \
   --machine-id 1
@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/instal
 使用 OpenRC 的发行版（Alpine 等）改用：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install-openrc.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install-openrc.sh | bash -s -- \
   --api https://api.example.com \
   --key 机器密钥 \
   --machine-id 1
@@ -52,7 +52,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/instal
 重复 `--machine <url> <key> <id>` 即可，每对组合生成一个独立实例：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --machine https://secapi.example.com 密钥A 10 \
   --machine https://api.example.com 密钥B 10
 ```
@@ -81,10 +81,10 @@ noders log -f
 
 ```bash
 # 按 machine_id 删除该机器的全部实例
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --uninstall --machine-id 1
 
 # 清空本机 NodeRS
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --uninstall --all
 ```

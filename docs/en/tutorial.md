@@ -28,7 +28,7 @@ This tutorial walks the full path from zero: Xboard panel → NodeRS node → cl
 Run this on the node machine (replace `https://api.example.com` with your panel API address and `MACHINE_KEY` with the key from step 1):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key MACHINE_KEY \
   --machine-id 1
@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/instal
 On OpenRC distributions (Alpine etc.) use:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install-openrc.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install-openrc.sh | bash -s -- \
   --api https://api.example.com \
   --key MACHINE_KEY \
   --machine-id 1
@@ -52,7 +52,7 @@ All installer options (pinning a version, custom paths, skipping the service, �
 Repeat `--machine <url> <key> <id>`; each pair becomes an independent instance:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --machine https://secapi.example.com KEY_A 10 \
   --machine https://api.example.com KEY_B 10
 ```
@@ -81,10 +81,10 @@ Not listening, or the panel still shows offline? Head to the [FAQ](faq.md).
 
 ```bash
 # Remove every instance of one machine by machine_id
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --uninstall --machine-id 1
 
 # Wipe NodeRS from this host
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --uninstall --all
 ```

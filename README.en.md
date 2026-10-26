@@ -8,17 +8,20 @@ modes are explicitly rejected.
 
 English | [简体中文](README.md)
 
-NodeRS is a Linux node agent for [Xboard](https://github.com/cedar2025/Xboard). One command on your server hooks it up to the panel; nodes, users, listen ports, and certificates are then provisioned from the panel, and the machine itself only keeps an API address, a machine key, and a `machine_id`. Protocols are served by [Aerion](https://github.com/MoeclubM/Aerion), the same implementation behind [XBClient](https://github.com/MoeclubM/XBClient).
+NodeRS is a Linux node agent for Xboard and PxBoard. Nodes, users, listen ports, and certificates are provisioned from the panel. The local configuration contains the panel type, API address, machine key, and `machine_id`. Protocols are served by [Aerion](https://github.com/MoeclubM/Aerion), the same implementation behind [XBClient](https://github.com/MoeclubM/XBClient).
 
-[![Release](https://img.shields.io/github/v/release/MoeclubM/NodeRS?style=flat-square)](https://github.com/MoeclubM/NodeRS/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/MoeclubM/NodeRS/ci.yml?style=flat-square&label=CI)](https://github.com/MoeclubM/NodeRS/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/MoeclubM/NodeRS?style=flat-square)](LICENSE)
+This organization fork of [MoeclubM/NodeRS](https://github.com/MoeclubM/NodeRS) adds native PxBoard integration while keeping Xboard as the default. Releases are downloaded from `MoeClub-Open/NodeRS`; tag `v0.1.49-pxboard.1` identifies executable version `0.1.49`. The original author's MIT license and copyright notice are preserved.
+
+[![Release](https://img.shields.io/github/v/release/MoeClub-Open/NodeRS?style=flat-square)](https://github.com/MoeClub-Open/NodeRS/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/MoeClub-Open/NodeRS/ci.yml?style=flat-square&label=CI)](https://github.com/MoeClub-Open/NodeRS/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/MoeClub-Open/NodeRS?style=flat-square)](LICENSE)
 
 ## Features
 
 - Works with Xboard machine mode (`/api/v2/server/*`, `/api/v2/server/machine/*`); node membership, user sync, traffic, and online status are reported automatically
+- Supports PxBoard's native machine API with `--panel-type pxboard`; Xboard remains the default
 - One process runs every node attached to the same machine — install once and you're done
-- Three lines of local config; the panel decides how nodes run and how certificates are issued
+- Local panel connection settings; the panel controls node configuration and certificates
 - Certificates come from the panel's `cert_config`: file paths, inline PEM, Let's Encrypt HTTP-01 / DNS-01 (Cloudflare, AliDNS), or local self-signed
 - Multi-user, device limits, and `speed_limit` are enforced at protocol runtime
 - Prebuilt packages for amd64 / arm64, GNU (glibc 2.36+) and musl, with architecture and libc detected by the installer
@@ -47,13 +50,23 @@ SS-2022 AES-128 and AES-256 support multiple users over TCP, UDP, and UoT, with 
 Create a machine in Xboard and note the machine ID and machine key. Attach your nodes to it and configure ports, protocols, and certificates, then run this on the server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key MACHINE_KEY \
   --machine-id 1
 ```
 
 On Alpine or other non-systemd distros, use [install-openrc.sh](scripts/install-openrc.sh) instead. For multiple panels on one server, pinning a version, and custom paths, see the [install docs](docs/en/install.md).
+
+For PxBoard, obtain the machine number and key from its Machines page, then install a PxBoard-capable NodeRS bundle:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+  --version v0.1.49-pxboard.1 --panel-type pxboard \
+  --api https://panel.example.com --key MACHINE_KEY --machine-id 1
+```
+
+See [PxBoard integration](docs/en/pxboard.md) for the API contract, bundle requirements, and traffic retry behavior.
 
 After the install, watch the logs — once your nodes are listening, you're done:
 
@@ -79,6 +92,7 @@ The full command list and selector syntax live in the [management CLI docs](docs
 | --- | --- |
 | [Getting-started tutorial](docs/en/tutorial.md) | The full path from panel to a working node |
 | [Install & upgrade](docs/en/install.md) | Installer options, building from source |
+| [PxBoard integration](docs/en/pxboard.md) | Native machine API, configuration, traffic retries |
 | [Management CLI](docs/en/management.md) | `noders` subcommands and selectors |
 | [Certificates](docs/en/certificates.md) | `cert_config` modes and DNS-01 |
 | [FAQ](docs/en/faq.md) | Nodes offline, startup failures, and other troubleshooting |

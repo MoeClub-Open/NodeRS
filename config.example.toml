@@ -1,4 +1,5 @@
 [panel]
+type = "xboard"
 api = "https://xboard.example.com"
 key = "replace-me"
 machine_id = 1

@@ -143,6 +143,10 @@ parse_args() {
         PANEL_API="$2"
         shift 2
         ;;
+      --panel-type)
+        PANEL_TYPE="${2,,}"
+        shift 2
+        ;;
       --key)
         PANEL_KEY="$2"
         shift 2
@@ -182,6 +186,8 @@ parse_args() {
 }
 
 validate_args() {
+  PANEL_TYPE="${PANEL_TYPE:-xboard}"
+  case "$PANEL_TYPE" in xboard|pxboard) ;; *) echo "--panel-type must be xboard or pxboard." >&2; exit 1 ;; esac
   if [[ -n "$PANEL_API" || -n "$PANEL_KEY" ]]; then
     if [[ -z "$PANEL_API" || -z "$PANEL_KEY" || -z "$PANEL_MACHINE_ID" ]]; then
       echo "--api, --key and --machine-id must be provided together." >&2
@@ -193,9 +199,14 @@ validate_args() {
     exit 1
   fi
 
-  local spec spec_machine_id target_machine_id
-  for spec in "${XBOARD_SPECS[@]}"; do
-    IFS='|' read -r _ _ spec_machine_id <<<"$spec"
+  local spec spec_machine_id target_machine_id index spec_api spec_key spec_panel_type
+  for index in "${!XBOARD_SPECS[@]}"; do
+    spec="${XBOARD_SPECS[$index]}"
+    IFS='|' read -r spec_api spec_key spec_machine_id spec_panel_type <<<"$spec"
+    spec_panel_type="${spec_panel_type:-$PANEL_TYPE}"
+    spec_panel_type="${spec_panel_type,,}"
+    case "$spec_panel_type" in xboard|pxboard) ;; *) echo "Machine panel type must be xboard or pxboard." >&2; exit 1 ;; esac
+    XBOARD_SPECS[$index]="$spec_api|$spec_key|$spec_machine_id|$spec_panel_type"
     if [[ ! "$spec_machine_id" =~ ^[0-9]+$ ]]; then
       printf 'machine_id must be a decimal integer: %q\n' "$spec_machine_id" >&2
       exit 1
@@ -231,7 +242,11 @@ machine_instance_id() {
   panel_api="$(normalized_panel_api "$1")"
   machine_id="$2"
   panel_hash="$(printf '%s' "$panel_api" | cksum | awk '{print $1}')"
-  printf '%s-%s\n' "$machine_id" "$panel_hash"
+  if [[ "${3:-xboard}" == "pxboard" ]]; then
+    printf 'pxboard-%s-%s\n' "$machine_id" "$panel_hash"
+  else
+    printf '%s-%s\n' "$machine_id" "$panel_hash"
+  fi
 }
 
 valid_managed_service_unit_name() {
@@ -269,16 +284,21 @@ render_config_file() {
   panel_api="$3"
   panel_key="$4"
   machine_id="$5"
+  local panel_type="${6:-xboard}"
 
   escaped_api="$(sed_escape "$panel_api")"
   escaped_key="$(sed_escape "$panel_key")"
   escaped_machine_id="$(sed_escape "$machine_id")"
 
   sed \
+    -e "s#type = \"xboard\"#type = \"$panel_type\"#g" \
     -e "s#api = \"https://xboard.example.com\"#api = \"$escaped_api\"#g" \
     -e "s#key = \"replace-me\"#key = \"$escaped_key\"#g" \
     -e "s#machine_id = 1#machine_id = $escaped_machine_id#g" \
     "$template_path" > "$target_path"
+  if ! grep -q '^[[:space:]]*type[[:space:]]*=' "$target_path"; then
+    sed -i "/^\[panel\]/a type = \"$panel_type\"" "$target_path"
+  fi
 }
 
 node_config_path() {
@@ -363,7 +383,7 @@ Commands:
   update [--version <tag>] [--no-restart]
       Upgrade the installed NodeRS binary.
 
-  uninstall [--all | --machine-id <id> | --machine <url> <key> <id>]
+  uninstall [--panel-type xboard|pxboard] [--all | --machine-id <id> | --machine <url> <key> <id>]
       Remove one machine instance or the whole installation.
 
   start [all|selector...]
@@ -377,9 +397,14 @@ Commands:
   help
       Show this help message.
 
+Environment:
+  NODERS_REPOSITORY
+      Override the release repository used by update/install (default: MoeClub-Open/NodeRS).
+
 Selectors:
   - Full service name, for example: noders-1-123456789
   - Machine ID, for example: 1
+  - PxBoard machine, for example: pxboard-1
   - Instance suffix, for example: 1-123456789
   - all
 
@@ -555,7 +580,8 @@ selector_matches_unit() {
     || [[ "$unit" == "${SERVICE_NAME}-${selector}" ]] \
     || [[ "$unit" == "${LEGACY_SERVICE_NAME}-${selector}" ]] \
     || [[ "$unit" == "${SERVICE_NAME}-${selector}-"* ]] \
-    || [[ "$unit" == "${LEGACY_SERVICE_NAME}-${selector}-"* ]]
+    || [[ "$unit" == "${LEGACY_SERVICE_NAME}-${selector}-"* ]] \
+    || [[ "$selector" =~ ^[0-9]+$ && "$unit" == "${SERVICE_NAME}-pxboard-${selector}-"* ]]
 }
 
 resolve_targets() {
@@ -769,7 +795,7 @@ interactive_update() {
 }
 
 interactive_uninstall() {
-  local choice machine_id confirm
+  local choice machine_id confirm panel_type
   echo "1) 卸载全部"
   echo "2) 按 machine_id 卸载"
   echo "0) 返回"
@@ -785,12 +811,14 @@ interactive_uninstall() {
       run_uninstall --all
       ;;
     2)
+      read -r -p "面板类型（xboard / pxboard，留空=xboard）: " panel_type
+      panel_type="${panel_type:-xboard}"
       read -r -p "请输入 machine_id: " machine_id
       if [[ -z "$machine_id" ]]; then
         echo "machine_id 不能为空。" >&2
         return 1
       fi
-      run_uninstall --machine-id "$machine_id"
+      run_uninstall --panel-type "${panel_type,,}" --machine-id "$machine_id"
       ;;
     0)
       return 0
@@ -1007,22 +1035,41 @@ EOF
   chmod 0755 "$target"
 }
 
+validate_bundle_panels() {
+  local staging_dir spec spec_panel_type config_path needs_pxboard=0
+  staging_dir="$1"
+  for spec in "${XBOARD_SPECS[@]:-}"; do
+    IFS='|' read -r _ _ _ spec_panel_type <<<"$spec"
+    [[ "${spec_panel_type:-xboard}" != "pxboard" ]] || needs_pxboard=1
+  done
+  for config_path in "${CONFIG_DIR%/}/machines/"*.toml; do
+    [[ -f "$config_path" ]] || continue
+    if grep -Eq '^[[:space:]]*type[[:space:]]*=[[:space:]]*"pxboard"' "$config_path"; then needs_pxboard=1; fi
+  done
+  if [[ "$needs_pxboard" -eq 1 ]] && ! "$staging_dir/noders" --supported-panels 2>/dev/null | grep -qw pxboard; then
+    echo "This release does not support PxBoard. Use a release or local bundle built from the PxBoard-enabled NodeRS source." >&2
+    exit 1
+  fi
+}
+
 write_xboard_configs() {
-  local staging_dir template_path spec panel_api panel_key machine_id instance_id config_path
+  local staging_dir template_path spec panel_api panel_key machine_id instance_id config_path spec_panel_type
   staging_dir="$1"
   template_path="$staging_dir/config.example.toml"
 
-  for spec in "${XBOARD_SPECS[@]}"; do
-    IFS='|' read -r panel_api panel_key machine_id <<<"$spec"
-    instance_id="$(machine_instance_id "$panel_api" "$machine_id")"
-    rm -f "$(legacy_node_config_path "$machine_id")"
+  for spec in "${XBOARD_SPECS[@]:-}"; do
+    IFS='|' read -r panel_api panel_key machine_id spec_panel_type <<<"$spec"
+    spec_panel_type="${spec_panel_type:-xboard}"
+    instance_id="$(machine_instance_id "$panel_api" "$machine_id" "$spec_panel_type")"
+    if [[ "$spec_panel_type" == "xboard" ]]; then rm -f "$(legacy_node_config_path "$machine_id")"; fi
     config_path="$(node_config_path "$instance_id")"
     render_config_file \
       "$template_path" \
       "$config_path" \
       "$panel_api" \
       "$panel_key" \
-      "$machine_id"
+      "$machine_id" \
+      "$spec_panel_type"
     GENERATED_CONFIGS+=("$config_path")
   done
 }

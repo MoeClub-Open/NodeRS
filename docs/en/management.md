@@ -21,19 +21,20 @@ Usage: noders <command> [options] [selector...]
 | `noders stop [all\|selector...]` | Stop services |
 | `noders restart [all\|selector...]` | Restart services |
 | `noders log [-f\|--follow] [-n\|--lines <count>] [all\|selector...]` | Show logs |
-| `noders uninstall [--all \| --machine-id <id> \| --machine <url> <key> <id>]` | Remove one instance or the whole installation |
+| `noders uninstall [--panel-type xboard\|pxboard] [--all \| --machine-id <id> \| --machine <url> <key> <id>]` | Select a panel type for targeted uninstall, or remove the whole installation |
 | `noders help` | Show help |
 
 Without a selector, commands apply to **every** instance discovered on the host.
 
 ## Selectors
 
-Selectors narrow an operation to a subset of instances. Four forms are supported:
+Selectors narrow an operation to a subset of instances:
 
 | Form | Example |
 | --- | --- |
 | Full service name | `noders-1-123456789` |
 | machine ID | `1` |
+| PxBoard machine | `pxboard-1` |
 | Instance suffix | `1-123456789` |
 | `all` | Every instance |
 
@@ -41,7 +42,10 @@ Selectors narrow an operation to a subset of instances. Four forms are supported
 noders restart 1              # restart only instances with machine_id = 1
 noders log -f 1-123456789     # follow one instance's logs
 noders stop all               # stop everything
+noders restart pxboard-1      # restart only PxBoard machine 1
 ```
+
+Numeric service selectors match the machine number across panel types. Targeted uninstall defaults to Xboard; use `noders uninstall --panel-type pxboard --machine-id 1` for PxBoard. A full PxBoard instance suffix is `pxboard-<machine_id>-<api_hash>`.
 
 ## Interactive Menu
 

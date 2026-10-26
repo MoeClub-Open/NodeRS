@@ -87,7 +87,7 @@ impl MachineRuntime {
                 ws::spawn_machine_websocket(self.panel.clone(), ws_url.to_string(), self.clone());
             }
         } else {
-            info!("Xboard websocket is disabled; using HTTP polling for machine sync");
+            info!("using HTTP polling for machine sync");
         }
 
         Ok(())
@@ -484,7 +484,7 @@ impl ManagedNode {
                             %error,
                             dropped_bytes,
                             users = traffic.len(),
-                            "traffic report result was ambiguous; not retrying to avoid double-counting"
+                            "traffic report result was ambiguous; Xboard counters are not restored; PxBoard retains its durable outbox for retry"
                         );
                     }
                 }

@@ -958,6 +958,7 @@ fn parses_machine_nodes_response() {
 #[test]
 fn websocket_url_uses_machine_credentials() {
     let panel = MachinePanelClient::new(&PanelConfig {
+        panel_type: Default::default(),
         api: "https://xboard.example.com".to_string(),
         key: "replace-me".to_string(),
         machine_id: 9,
@@ -975,6 +976,7 @@ fn websocket_url_uses_machine_credentials() {
 #[test]
 fn websocket_url_accepts_http_scheme_from_panel() {
     let panel = MachinePanelClient::new(&PanelConfig {
+        panel_type: Default::default(),
         api: "https://xboard.example.com".to_string(),
         key: "replace-me".to_string(),
         machine_id: 9,

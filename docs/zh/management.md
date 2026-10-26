@@ -21,19 +21,20 @@ noders
 | `noders stop [all\|selector...]` | 停止服务 |
 | `noders restart [all\|selector...]` | 重启服务 |
 | `noders log [-f\|--follow] [-n\|--lines <count>] [all\|selector...]` | 查看日志 |
-| `noders uninstall [--all \| --machine-id <id> \| --machine <url> <key> <id>]` | 卸载一个实例或整个安装 |
+| `noders uninstall [--panel-type xboard\|pxboard] [--all \| --machine-id <id> \| --machine <url> <key> <id>]` | 按面板类型卸载一个实例或整个安装 |
 | `noders help` | 显示帮助 |
 
 不传选择器时，命令作用于本机发现的**全部**实例。
 
 ## 选择器
 
-选择器用于把操作范围缩小到部分实例，支持四种写法：
+选择器用于把操作范围缩小到部分实例：
 
 | 写法 | 示例 |
 | --- | --- |
 | 完整服务名 | `noders-1-123456789` |
 | machine_id | `1` |
+| PxBoard 机器 | `pxboard-1` |
 | 实例后缀 | `1-123456789` |
 | `all` | 作用于全部实例 |
 
@@ -41,7 +42,10 @@ noders
 noders restart 1              # 只重启 machine_id = 1 的实例
 noders log -f 1-123456789     # 跟踪一个实例的日志
 noders stop all               # 停止全部
+noders restart pxboard-1      # 只重启 PxBoard 编号为 1 的机器
 ```
+
+数字选择器会选择两种面板中相同编号的机器。卸载指定机器时默认查找 Xboard；PxBoard 使用 `noders uninstall --panel-type pxboard --machine-id 1`。完整 PxBoard 实例后缀为 `pxboard-<machine_id>-<api_hash>`。
 
 ## 交互菜单
 
