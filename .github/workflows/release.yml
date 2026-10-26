@@ -5,6 +5,12 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Existing tag to publish; leave empty for a dev build only'
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -12,6 +18,7 @@ permissions:
 env:
   BIN_NAME: noders
   GNU_GLIBC_FLOOR: "2.36"
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && (inputs.release_tag || 'dev') || github.ref_name }}
 
 jobs:
   build-gnu:
@@ -28,6 +35,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -56,12 +65,10 @@ jobs:
 
       - name: Prepare release package
         shell: bash
-        env:
-          RELEASE_TAG: ${{ github.event_name != 'workflow_dispatch' && github.ref_name || 'dev' }}
         run: |
           set -euo pipefail
           bash scripts/package-release-bundle.sh \
-            --release-tag "${RELEASE_TAG:-dev}" \
+            --release-tag "${RELEASE_TAG}" \
             --target x86_64-unknown-linux-gnu \
             --asset-suffix linux-amd64
 
@@ -86,6 +93,8 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -114,12 +123,10 @@ jobs:
 
       - name: Prepare release package
         shell: bash
-        env:
-          RELEASE_TAG: ${{ github.event_name != 'workflow_dispatch' && github.ref_name || 'dev' }}
         run: |
           set -euo pipefail
           bash scripts/package-release-bundle.sh \
-            --release-tag "${RELEASE_TAG:-dev}" \
+            --release-tag "${RELEASE_TAG}" \
             --target aarch64-unknown-linux-gnu \
             --asset-suffix linux-arm64
 
@@ -138,6 +145,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Resolve libclang path
         run: |
@@ -160,12 +169,10 @@ jobs:
 
       - name: Prepare release package
         shell: bash
-        env:
-          RELEASE_TAG: ${{ github.event_name != 'workflow_dispatch' && github.ref_name || 'dev' }}
         run: |
           set -euo pipefail
           bash scripts/package-release-bundle.sh \
-            --release-tag "${RELEASE_TAG:-dev}" \
+            --release-tag "${RELEASE_TAG}" \
             --target x86_64-unknown-linux-musl \
             --asset-suffix linux-amd64-musl
 
@@ -184,6 +191,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
 
       - name: Resolve libclang path
         run: |
@@ -206,12 +215,10 @@ jobs:
 
       - name: Prepare release package
         shell: bash
-        env:
-          RELEASE_TAG: ${{ github.event_name != 'workflow_dispatch' && github.ref_name || 'dev' }}
         run: |
           set -euo pipefail
           bash scripts/package-release-bundle.sh \
-            --release-tag "${RELEASE_TAG:-dev}" \
+            --release-tag "${RELEASE_TAG}" \
             --target aarch64-unknown-linux-musl \
             --asset-suffix linux-arm64-musl
 
@@ -226,7 +233,7 @@ jobs:
     name: Publish Linux release assets
     needs: [build-gnu, build-arm64-gnu, build-musl, build-arm64-musl]
     runs-on: ubuntu-latest
-    if: github.event_name != 'workflow_dispatch'
+    if: github.event_name != 'workflow_dispatch' || inputs.release_tag != ''
     permissions:
       contents: write
     steps:
@@ -240,8 +247,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            gh release upload "${{ github.ref_name }}" --repo "${{ github.repository }}" dist/*.tar.gz dist/*.sha256 --clobber
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" dist/*.tar.gz dist/*.sha256 --clobber
           else
-            gh release create "${{ github.ref_name }}" --repo "${{ github.repository }}" --generate-notes dist/*.tar.gz dist/*.sha256
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --generate-notes dist/*.tar.gz dist/*.sha256
           fi
