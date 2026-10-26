@@ -9,6 +9,7 @@ use crate::config::{PanelConfig, PanelType};
 use crate::pxboard::PxBoardClient;
 
 mod cert;
+mod recovery;
 
 pub use cert::CertConfig;
 
@@ -700,6 +701,43 @@ impl MachinePanelClient {
         ensure_success(response.status(), "report machine status")
     }
 
+    pub async fn managed_configuration(
+        &self,
+    ) -> anyhow::Result<Option<crate::management::ManagedConfiguration>> {
+        if let Some(panel) = &self.pxboard {
+            return panel.managed_configuration().await;
+        }
+        let response = self
+            .client
+            .post(self.url("/api/v2/server/machine/nodes"))
+            .query(&self.machine_query())
+            .send()
+            .await?;
+        ensure_success(response.status(), "fetch managed configuration")?;
+        let body: Value = response.json().await?;
+        serde_json::from_value(body["agent_config"]["managed_configuration"].clone())
+            .context("decode managed machine configuration")
+    }
+
+    pub async fn configuration_status(
+        &self,
+        revision: u64,
+        status: &str,
+        message: &str,
+    ) -> anyhow::Result<()> {
+        if let Some(panel) = &self.pxboard {
+            return panel.configuration_status(revision, status, message).await;
+        }
+        let response = self
+            .client
+            .post(self.url("/api/v2/server/machine/configuration/status"))
+            .query(&self.machine_query())
+            .json(&serde_json::json!({"revision":revision,"status":status,"message":message}))
+            .send()
+            .await?;
+        ensure_success(response.status(), "report managed configuration result")
+    }
+
     fn machine_query(&self) -> Vec<(&str, String)> {
         vec![
             ("token", self.token.clone()),
@@ -743,6 +781,16 @@ impl NodePanelClient {
         if let Some(panel) = &self.machine.pxboard {
             return panel.traffic(self.node_id, traffic).await;
         }
+        self.replay_final_traffic()
+            .await
+            .map_err(TrafficReportError::Definite)?;
+        self.send_xboard_traffic(traffic).await
+    }
+
+    pub(super) async fn send_xboard_traffic(
+        &self,
+        traffic: HashMap<i64, [u64; 2]>,
+    ) -> Result<(), TrafficReportError> {
         if traffic.is_empty() {
             return Ok(());
         }

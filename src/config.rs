@@ -1,9 +1,9 @@
 use anyhow::Context;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct AppConfig {
     pub panel: PanelConfig,
 }
@@ -15,7 +15,7 @@ impl AppConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 pub struct PanelConfig {
     #[serde(default, rename = "type")]
     pub panel_type: PanelType,
@@ -26,7 +26,7 @@ pub struct PanelConfig {
     pub machine_id: i64,
 }
 
-#[derive(Debug, Clone, Copy, Default, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum PanelType {
     #[default]

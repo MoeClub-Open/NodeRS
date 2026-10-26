@@ -1,4 +1,3 @@
-use anyhow::Context;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -24,23 +23,13 @@ const DEFAULT_STATUS_INTERVAL_SECONDS: u64 = 60;
 const DEFAULT_PROTOCOL_ASSET_REFRESH_INTERVAL_SECONDS: u64 = 60;
 const DEFAULT_MIN_TRAFFIC_BYTES: u64 = 0;
 
-pub async fn run(config: AppConfig) -> anyhow::Result<()> {
-    let runtime = Arc::new(MachineRuntime::new(config)?);
-    runtime.initialize().await?;
-    runtime.spawn_background_tasks();
-
-    info!("NodeRS is running; press Ctrl+C to stop");
-    tokio::signal::ctrl_c().await.context("wait for Ctrl+C")?;
-    runtime.shutdown_all().await;
-    Ok(())
-}
-
 pub(crate) struct MachineRuntime {
     panel: MachinePanelClient,
     nodes: RwLock<HashMap<i64, Arc<ManagedNode>>>,
     machine_base_config: RwLock<Option<BaseConfig>>,
     machine_pull_interval: AtomicU64,
     reconcile_lock: AsyncMutex<()>,
+    task_handles: Mutex<Vec<JoinHandle<()>>>,
 }
 
 struct ManagedNode {
@@ -53,7 +42,7 @@ struct ManagedNode {
     push_interval: AtomicU64,
     sync_state: AsyncMutex<NodeSyncState>,
     shutdown_tx: watch::Sender<bool>,
-    task_handles: Mutex<Vec<JoinHandle<()>>>,
+    task_handles: Mutex<Vec<(JoinHandle<()>, bool)>>,
 }
 
 #[derive(Default)]
@@ -65,6 +54,16 @@ struct NodeSyncState {
 }
 
 impl MachineRuntime {
+    pub(crate) async fn start(config: AppConfig) -> anyhow::Result<Arc<Self>> {
+        let runtime = Arc::new(Self::new(config)?);
+        if let Err(error) = runtime.initialize().await {
+            let _ = runtime.shutdown_all().await;
+            return Err(error);
+        }
+        runtime.spawn_background_tasks();
+        Ok(runtime)
+    }
+
     fn new(config: AppConfig) -> anyhow::Result<Self> {
         Ok(Self {
             panel: MachinePanelClient::new(&config.panel)?,
@@ -72,6 +71,7 @@ impl MachineRuntime {
             machine_base_config: RwLock::new(None),
             machine_pull_interval: AtomicU64::new(DEFAULT_PANEL_PULL_INTERVAL_SECONDS),
             reconcile_lock: AsyncMutex::new(()),
+            task_handles: Mutex::new(Vec::new()),
         })
     }
 
@@ -84,7 +84,11 @@ impl MachineRuntime {
             if ws_url.is_empty() {
                 warn!("Xboard websocket handshake succeeded but ws_url is empty");
             } else {
-                ws::spawn_machine_websocket(self.panel.clone(), ws_url.to_string(), self.clone());
+                self.register_task(ws::spawn_machine_websocket(
+                    self.panel.clone(),
+                    ws_url.to_string(),
+                    self.clone(),
+                ));
             }
         } else {
             info!("using HTTP polling for machine sync");
@@ -101,19 +105,19 @@ impl MachineRuntime {
 
     fn spawn_machine_sync_task(self: &Arc<Self>) {
         let runtime = self.clone();
-        tokio::spawn(async move {
+        self.register_task(tokio::spawn(async move {
             loop {
                 tokio::time::sleep(Duration::from_secs(runtime.machine_pull_interval())).await;
                 if let Err(error) = runtime.refresh_machine_nodes().await {
                     warn!(%error, "machine node sync failed");
                 }
             }
-        });
+        }));
     }
 
     fn spawn_status_task(self: &Arc<Self>) {
         let runtime = self.clone();
-        tokio::spawn(async move {
+        self.register_task(tokio::spawn(async move {
             let mut ticker =
                 tokio::time::interval(Duration::from_secs(DEFAULT_STATUS_INTERVAL_SECONDS));
             ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
@@ -129,12 +133,12 @@ impl MachineRuntime {
                     }
                 }
             }
-        });
+        }));
     }
 
     fn spawn_protocol_asset_refresh_task(self: &Arc<Self>) {
         let runtime = self.clone();
-        tokio::spawn(async move {
+        self.register_task(tokio::spawn(async move {
             let mut ticker = tokio::time::interval(Duration::from_secs(
                 DEFAULT_PROTOCOL_ASSET_REFRESH_INTERVAL_SECONDS,
             ));
@@ -147,7 +151,7 @@ impl MachineRuntime {
                     }
                 }
             }
-        });
+        }));
     }
 
     pub(crate) async fn refresh_machine_nodes(&self) -> anyhow::Result<()> {
@@ -304,7 +308,9 @@ impl MachineRuntime {
 
         for node in removed {
             info!(node_id = node.node_id, "stopping node removed by panel");
-            node.shutdown().await;
+            if let Err(error) = node.shutdown().await {
+                warn!(node_id = node.node_id, %error, "removed node has unconfirmed traffic");
+            }
         }
 
         for (node, protocol) in restarted {
@@ -314,7 +320,7 @@ impl MachineRuntime {
                 new_protocol = protocol.as_str(),
                 "restarting node after panel protocol change"
             );
-            node.shutdown().await;
+            node.shutdown().await?;
         }
 
         let machine_base_config = self.machine_base_config();
@@ -334,7 +340,10 @@ impl MachineRuntime {
                 self.panel.node_client(summary.id),
                 machine_base_config.clone(),
             ));
-            node.initialize().await?;
+            if let Err(error) = node.initialize().await {
+                let _ = node.shutdown().await;
+                return Err(error);
+            }
             node.spawn_background_tasks();
             self.nodes
                 .write()
@@ -351,10 +360,58 @@ impl MachineRuntime {
         Ok(())
     }
 
-    async fn shutdown_all(&self) {
-        for node in self.nodes_snapshot() {
-            node.shutdown().await;
+    pub(crate) async fn shutdown_all(&self) -> anyhow::Result<()> {
+        let _guard = self.reconcile_lock.lock().await;
+        let handles = std::mem::take(
+            &mut *self
+                .task_handles
+                .lock()
+                .expect("machine task lock poisoned"),
+        );
+        for handle in &handles {
+            handle.abort();
         }
+        for handle in handles {
+            let _ = handle.await;
+        }
+        let nodes = self.nodes_snapshot();
+        let outcomes =
+            futures_util::future::join_all(nodes.iter().map(|node| node.shutdown())).await;
+        let failure = outcomes.into_iter().find_map(Result::err);
+        match failure {
+            Some(error) => Err(error),
+            None => self.panel.ensure_traffic_reconciled().await,
+        }
+    }
+
+    pub(crate) async fn resume(self: &Arc<Self>) -> anyhow::Result<()> {
+        for node in self.nodes_snapshot() {
+            node.shutdown_tx.send_replace(false);
+            let config = node.sync_state.lock().await.config.clone();
+            if let Some(config) = config {
+                node.controller.apply_remote_config(&config).await?;
+            }
+            node.spawn_background_tasks();
+        }
+        if let Err(error) = self.initialize().await {
+            warn!(%error, "resumed cached nodes; panel refresh will retry");
+        }
+        self.spawn_background_tasks();
+        Ok(())
+    }
+
+    pub(crate) async fn ensure_running(&self) -> anyhow::Result<()> {
+        for node in self.nodes_snapshot() {
+            node.controller.ensure_running().await?;
+        }
+        Ok(())
+    }
+
+    fn register_task(&self, handle: JoinHandle<()>) {
+        self.task_handles
+            .lock()
+            .expect("machine task lock poisoned")
+            .push(handle);
     }
 
     fn machine_base_config(&self) -> Option<BaseConfig> {
@@ -418,31 +475,34 @@ impl ManagedNode {
     fn spawn_background_tasks(self: &Arc<Self>) {
         let sync_node = self.clone();
         let mut sync_shutdown = self.shutdown_tx.subscribe();
-        self.register_task(tokio::spawn(async move {
-            loop {
-                if wait_for_interval_or_shutdown(
-                    &mut sync_shutdown,
-                    Duration::from_secs(sync_node.pull_interval()),
-                )
-                .await
-                {
-                    break;
-                }
+        self.register_task(
+            tokio::spawn(async move {
+                loop {
+                    if wait_for_interval_or_shutdown(
+                        &mut sync_shutdown,
+                        Duration::from_secs(sync_node.pull_interval()),
+                    )
+                    .await
+                    {
+                        break;
+                    }
 
-                if let Err(error) = sync_node.sync_config(false).await {
-                    warn!(node_id = sync_node.node_id, %error, "config sync failed");
-                }
+                    if let Err(error) = sync_node.sync_config(false).await {
+                        warn!(node_id = sync_node.node_id, %error, "config sync failed");
+                    }
 
-                if let Err(error) = sync_node.sync_users(false).await {
-                    warn!(node_id = sync_node.node_id, %error, "user sync failed");
-                }
+                    if let Err(error) = sync_node.sync_users(false).await {
+                        warn!(node_id = sync_node.node_id, %error, "user sync failed");
+                    }
 
-                debug!(
-                    node_id = sync_node.node_id,
-                    "Aerion core owns online session state; skipping panel alive list fetch"
-                );
-            }
-        }));
+                    debug!(
+                        node_id = sync_node.node_id,
+                        "Aerion core owns online session state; skipping panel alive list fetch"
+                    );
+                }
+            }),
+            false,
+        );
 
         let report_node = self.clone();
         let mut report_shutdown = self.shutdown_tx.subscribe();
@@ -475,6 +535,9 @@ impl ManagedNode {
                         );
                     }
                     Err(TrafficReportError::Uncertain(error)) => {
+                        if let Err(save_error) = report_node.panel.preserve_uncertain_traffic(&traffic).await {
+                            warn!(%save_error, "could not preserve unconfirmed traffic record");
+                        }
                         let dropped_bytes = traffic
                             .values()
                             .map(|[upload, download]| upload + download)
@@ -500,7 +563,7 @@ impl ManagedNode {
                     }
                 }
             }
-        }));
+        }), true);
     }
 
     async fn sync_config(&self, force_refresh: bool) -> anyhow::Result<()> {
@@ -613,18 +676,32 @@ impl ManagedNode {
         self.controller.snapshot_alive().await
     }
 
-    async fn shutdown(&self) {
-        let _ = self.shutdown_tx.send(true);
+    async fn shutdown(&self) -> anyhow::Result<()> {
+        self.shutdown_tx.send_replace(true);
         let handles = {
             let mut task_handles = self.task_handles.lock().expect("task handle lock poisoned");
             std::mem::take(&mut *task_handles)
         };
-        for handle in handles {
-            handle.abort();
+        for (handle, graceful) in handles {
+            if !graceful {
+                handle.abort();
+            }
+            let _ = handle.await;
         }
 
-        let _ = self.replace_users(&[]).await;
         self.controller.shutdown().await;
+        self.flush_protocol_traffic().await?;
+        let traffic = self.accounting.snapshot_traffic(DEFAULT_MIN_TRAFFIC_BYTES);
+        match self.panel.report_final_traffic(traffic.clone()).await {
+            Ok(()) => Ok(()),
+            Err(TrafficReportError::Definite(error)) => {
+                self.accounting.restore_traffic(&traffic);
+                Err(error.context("final traffic report was not delivered"))
+            }
+            Err(TrafficReportError::Uncertain(error)) => {
+                Err(error.context("final traffic is unconfirmed; panel migration cancelled"))
+            }
+        }
     }
 
     async fn replace_users(&self, users: &[PanelUser]) -> anyhow::Result<()> {
@@ -665,11 +742,11 @@ impl ManagedNode {
         self.push_interval.load(Ordering::Relaxed).max(5)
     }
 
-    fn register_task(&self, handle: JoinHandle<()>) {
+    fn register_task(&self, handle: JoinHandle<()>, graceful: bool) {
         self.task_handles
             .lock()
             .expect("task handle lock poisoned")
-            .push(handle);
+            .push((handle, graceful));
     }
 }
 

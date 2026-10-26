@@ -149,4 +149,10 @@ impl ProtocolController {
             Self::Aerion(server) => server.shutdown().await,
         }
     }
+
+    pub async fn ensure_running(&self) -> anyhow::Result<()> {
+        match self {
+            Self::Aerion(server) => server.ensure_running().await,
+        }
+    }
 }

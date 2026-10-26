@@ -1,4 +1,5 @@
 use super::*;
+use anyhow::Context;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -133,7 +134,7 @@ async fn identical_config_replay_preserves_live_sudoku_connection() -> anyhow::R
         Ok::<(), anyhow::Error>(())
     })
     .await;
-    node.shutdown().await;
+    let _ = node.shutdown().await;
     client.abort();
     echo.abort();
     result??;

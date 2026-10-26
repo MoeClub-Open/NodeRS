@@ -182,6 +182,17 @@ impl ServerController {
         self.core.cancel_all_sessions();
     }
 
+    pub async fn ensure_running(&self) -> anyhow::Result<()> {
+        let inner = self.inner.lock().await;
+        if let Some(server) = inner.as_ref() {
+            ensure!(
+                !server.handles.iter().any(|handle| handle.is_finished()),
+                "protocol listener exited during configuration change"
+            );
+        }
+        Ok(())
+    }
+
     async fn restart(&self) -> anyhow::Result<()> {
         let mut inner = self.inner.lock().await;
         let remote = self.remote.read().await.clone();

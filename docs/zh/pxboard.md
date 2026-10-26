@@ -86,6 +86,65 @@ cd /var/lib/noders/anytls
 
 当前使用 HTTP 轮询。协议能力由 Aerion 决定；不支持的传输、路由和回落设置会阻止该节点配置应用，避免静默改变配置含义。面板应下发该协议需要的有效证书与密钥。
 
+## 面板配置管理与迁移
+
+包含配置管理功能的 NodeRS 每 30 秒向当前已认证面板检查一次本地面板配置。PxBoard 管理员可在机器页下发新的面板类型、地址、机器编号与密钥；NodeRS 只更新启动时指定的 TOML 文件，不接受远程文件路径或系统命令。
+
+| 方法与相对路径 | 内容 |
+| --- | --- |
+| `GET /configuration` | `data` 为 `null`，或 `{revision, config: {panel: {type, api, key, machine_id}}}` |
+| `POST /configuration/status` | `{revision, status: "applied" 或 "failed", message}` |
+
+以上接口沿用当前机器的 `X-Machine-Key` 认证。配置包含机器密钥，仅允许信任的面板管理员设置迁移目标。
+
+应用前会认证目标机器，读取其全部节点配置和用户，再备份现有 TOML 文件。随后停止旧面板的同步任务、结束现有连接并向旧面板回报最后流量，启动目标节点并保存新配置。目标配置、监听或保存失败时恢复旧配置及运行；若旧节点也无法恢复，则保留旧配置并退出，由服务管理器重新启动。迁移会断开已有连接，客户端需要重新连接。
+
+备份以 `<原配置文件>.backup-<时间编号>` 保存在同一目录。配置结果在目标启动并保存后发回原面板；回报失败会将含原面板认证信息的待回报文件保存在 `<原配置文件>.configuration-status.json`，下次轮询或重启后继续发送。配置目录需要允许 NodeRS 服务用户写入，备份与待回报文件应按密钥保存。
+
+### 从 Xboard 接管
+
+源 Xboard 需要在已经认证的 `POST /api/v2/server/machine/nodes` 响应中附加以下字段，普通节点列表及其他字段保持原样：
+
+```json
+{
+  "agent_config": {
+    "managed_configuration": {
+      "revision": 1,
+      "config": {
+        "panel": {
+          "type": "pxboard",
+          "api": "https://panel.example.com",
+          "key": "target-machine-key",
+          "machine_id": 1
+        }
+      }
+    }
+  }
+}
+```
+
+NodeRS 通过原 Xboard 的 `token` 与 `machine_id` 鉴权请求取得指令，并以相同鉴权向 `POST /api/v2/server/machine/configuration/status` 回报 `{revision,status,message}`。Xboard 收到结果后应停止下发同一版本；重试使用新的 `revision`。未添加这些扩展的 Xboard 继续按原方式工作。官方迁移插件仓库提供源站桥接文件，安装与卸载方式见该仓库的迁移文档。
+
+源面板无法下发配置时，可以在节点服务器准备目标 TOML 文件，使用新 NodeRS 执行：
+
+```bash
+/usr/local/lib/noders/noders --migrate-panel \
+  /etc/noders/anytls/machines/原配置.toml \
+  /root/target-pxboard.toml
+```
+
+命令认证目标后备份并原位更新现有文件。正在运行且支持配置管理的 NodeRS 会在 30 秒内读取并切换；较旧程序需要先升级，再重启原服务。目标文件含密钥，应仅允许管理员读取。
+
+原服务名、配置文件名和工作目录在迁移后保持原值，维护时使用原服务全名。不要同时为相同监听端口安装另一个 PxBoard 实例。迁移回旧面板时，将对应备份恢复到原配置路径；运行中的新版 NodeRS 会重新验证并切回，也可以停止服务后恢复文件并重新启动。
+
+### 最后流量与停止服务
+
+Xboard 的流量接口没有批次去重。最后流量先写入工作目录中的 `xboard-final-node-*.json` 再发送，明确未投递的 `pending` 记录会在原面板下次回报时重试。无法判断服务器是否接收的记录会标为 `unconfirmed`，也可能以 `xboard-unconfirmed-node-*.json` 保存；NodeRS 保留这些记录，继续回报新的流量，但拒绝迁移。
+
+管理员需结合旧面板的入账记录核对不确定批次。确认已处理后，将对应记录的 `status` 改为 `resolved`，保留原档，然后使用新的配置版本号重试。不要未经核对直接重发，避免重复扣量。PxBoard 的待报批次使用原编号重试；切换前会扫描同来源、同机器的全部队列，包含已移除节点，无法排空则停止迁移。
+
+程序收到 `SIGTERM` 或 Ctrl+C 后停止同步，等待正在进行的流量回报完成，停止节点并保存和发送最后流量。systemd 模板使用 `TimeoutStopSec=300`；现有服务需要更新此配置。源站断网时仍会保留已落盘记录。正在进行的机器节点重建或证书申请可能延长停止时间；避免强制结束进程，并保留整个工作目录。
+
 ## 流量重试与维护
 
 每次回报先将批次写入工作目录中的 `pxboard-<面板地址编码>-<机器编号>-node-<节点编号>-traffic.json`，再发送给面板。网络失败或程序重启后使用原批次编号重试；节点插件按批次去重。收到面板确认后才从队列删除批次。不同面板、机器与节点的队列分开保存。

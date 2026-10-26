@@ -2,6 +2,7 @@ mod accounting;
 mod acme;
 mod config;
 mod logging;
+mod management;
 mod panel;
 mod protocols;
 mod pxboard;
@@ -27,6 +28,19 @@ async fn main() -> anyhow::Result<()> {
     let _ = rustls::crypto::ring::default_provider().install_default();
     logging::init();
 
+    if argument.as_deref() == Some("--migrate-panel") {
+        let arguments: Vec<_> = std::env::args().skip(2).collect();
+        anyhow::ensure!(
+            arguments.len() == 2,
+            "usage: noders --migrate-panel <existing-config.toml> <target-config.toml>"
+        );
+        return management::migrate_file(
+            std::path::Path::new(&arguments[0]),
+            std::path::Path::new(&arguments[1]),
+        )
+        .await;
+    }
+
     let config_path = argument
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("config.toml"));
@@ -35,5 +49,5 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_context(|| format!("load config from {}", config_path.display()))?;
 
-    runtime::run(config).await
+    management::run(&config_path, config).await
 }

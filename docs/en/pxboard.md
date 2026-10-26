@@ -86,6 +86,65 @@ Node configuration contains `protocol`, `host`, `listen`, `transport`, `security
 
 The current integration uses HTTP polling. Aerion determines protocol capabilities. Unsupported transports, routing, or fallback settings prevent that node configuration from being applied instead of silently changing its meaning. The panel must supply valid certificate and key settings where required.
 
+## Managed Configuration and Panel Migration
+
+NodeRS checks its currently authenticated panel every 30 seconds for a new local panel configuration. PxBoard administrators can change the panel type, address, machine number, and key from the machine page. NodeRS updates only the TOML file supplied at startup; it accepts no remote file paths or system commands.
+
+| Method and relative path | Payload |
+| --- | --- |
+| `GET /configuration` | `data: null`, or `{revision, config: {panel: {type, api, key, machine_id}}}` |
+| `POST /configuration/status` | `{revision, status: "applied" or "failed", message}` |
+
+Both requests authenticate with the current `X-Machine-Key`. Target configuration contains a machine key and should be managed only by trusted panel administrators.
+
+Before applying a change, NodeRS authenticates the target machine, fetches every target node configuration and user list, and backs up its existing TOML file. It then stops old synchronization tasks, closes existing connections, drains final traffic to the source panel, starts the target nodes, and saves the new configuration. Configuration, listener, or save failures restore the source runtime. If restoring the source also fails, NodeRS saves the source configuration and exits so the service manager can restart it. Clients must reconnect during a migration.
+
+Backups are saved beside the original file as `<config>.backup-<time>`. Results are sent to the source panel only after target startup and persistence. An undelivered result is saved as `<config>.configuration-status.json` and retried during later polling or after restart. This receipt contains source authentication credentials. The service user needs write access to the configuration directory; protect backups and receipts as credentials.
+
+### Taking Over from Xboard
+
+The source Xboard must add the following extension to its authenticated `POST /api/v2/server/machine/nodes` response, alongside its normal fields:
+
+```json
+{
+  "agent_config": {
+    "managed_configuration": {
+      "revision": 1,
+      "config": {
+        "panel": {
+          "type": "pxboard",
+          "api": "https://panel.example.com",
+          "key": "target-machine-key",
+          "machine_id": 1
+        }
+      }
+    }
+  }
+}
+```
+
+NodeRS retrieves this command using the existing Xboard `token` and `machine_id` authentication. It reports `{revision,status,message}` to `POST /api/v2/server/machine/configuration/status` with the same authentication. The source should stop delivering a revision after its result; retries require a new revision. Xboard installations without the extension continue working normally. The official plugins repository includes the source bridge and its installation and removal instructions.
+
+If the source cannot deliver configuration, prepare a target TOML file on the node and run the updated executable:
+
+```bash
+/usr/local/lib/noders/noders --migrate-panel \
+  /etc/noders/anytls/machines/original-config.toml \
+  /root/target-pxboard.toml
+```
+
+The command authenticates the target, backs up the existing file, and updates it in place. A running NodeRS with managed configuration support detects it within 30 seconds. Upgrade older executables first and restart the existing service. Restrict access to the target file because it contains a key.
+
+Service names, file names, and working directories remain unchanged after migration; use the original full service name for maintenance. Avoid installing another instance on the same ports. To return to the source panel, restore its backup to the original path; a running updated NodeRS validates and reloads it. Alternatively, stop the service, restore the file, and start it again.
+
+### Final Usage and Service Shutdown
+
+Xboard usage reports have no batch deduplication. Final usage is saved to `xboard-final-node-*.json` before delivery. Records proven undelivered remain `pending` and are retried against the source panel during later reporting. An ambiguous result becomes `unconfirmed`, or is stored as `xboard-unconfirmed-node-*.json`. NodeRS preserves these records, continues reporting new usage, and blocks migration until they are reconciled.
+
+Check ambiguous records against the source panel's usage ledger. Once resolved, change their `status` to `resolved`, retain the original records, and retry with a new configuration revision. Replaying without checking can charge usage twice. PxBoard retries its original batch IDs; migration scans every queue for the source machine, including removed nodes, and stops if any cannot be drained.
+
+On `SIGTERM` or Ctrl+C, NodeRS stops synchronization, waits for in-flight usage reports, closes nodes, and saves and sends final usage. The systemd template sets `TimeoutStopSec=300`; update existing units accordingly. Saved records survive source outages. An in-progress machine reconciliation or certificate request can delay shutdown; avoid forcing termination and retain the complete working directory.
+
 ## Traffic Retries and Maintenance
 
 Before sending usage, NodeRS writes a batch to `pxboard-<encodedPanelAddress>-<machineId>-node-<nodeId>-traffic.json` in its working directory. A network failure or process restart retries the same batch ID; the nodes plugin deduplicates it. A batch is removed only after the panel acknowledges it. Files are separated by panel, machine, and node.

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -58,14 +58,13 @@ impl Accounting {
     }
 
     pub fn replace_users(&self, users: &[PanelUser]) {
-        let valid_ids = users.iter().map(|user| user.id).collect::<HashSet<_>>();
         let mut traffic = self.traffic.write().expect("traffic lock poisoned");
         for user in users {
             traffic
                 .entry(user.id)
                 .or_insert_with(|| Arc::new(UsageCounter::default()));
         }
-        traffic.retain(|uid, _| valid_ids.contains(uid));
+        // Removed users can still have usage awaiting the next report.
     }
 
     pub fn traffic_counter(&self, uid: i64) -> Arc<UsageCounter> {
@@ -114,7 +113,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn replace_users_removes_old_counters() {
+    fn replace_users_preserves_unreported_counters() {
         let accounting = Accounting::new();
         accounting.replace_users(&[PanelUser {
             id: 1,
@@ -127,7 +126,7 @@ mod tests {
             ..Default::default()
         }]);
 
-        assert!(accounting.snapshot_traffic(0).is_empty());
+        assert_eq!(accounting.snapshot_traffic(0).get(&1), Some(&[100, 0]));
         accounting.traffic_counter(2).record_download(40);
         assert_eq!(accounting.snapshot_traffic(0).get(&2), Some(&[0, 40]));
     }

@@ -138,6 +138,28 @@ impl PxBoardClient {
         }
         Ok(())
     }
+    pub async fn managed_configuration(
+        &self,
+    ) -> anyhow::Result<Option<crate::management::ManagedConfiguration>> {
+        self.request(Method::GET, "/configuration", None).await
+    }
+    pub async fn configuration_status(
+        &self,
+        revision: u64,
+        status: &str,
+        message: &str,
+    ) -> anyhow::Result<()> {
+        let _: Value = self
+            .request(
+                Method::POST,
+                "/configuration/status",
+                Some(json!({
+                    "revision": revision, "status": status, "message": message,
+                })),
+            )
+            .await?;
+        Ok(())
+    }
     pub async fn nodes(&self) -> anyhow::Result<MachineNodesResponse> {
         let data: Nodes = self.request(Method::GET, "/nodes", None).await?;
         Ok(MachineNodesResponse {
@@ -366,6 +388,35 @@ impl PxBoardClient {
             if let Err(e) = outbox.save().await {
                 outbox.batches.push_front(batch);
                 return Err(TrafficReportError::Uncertain(e));
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn drain_outboxes(&self) -> anyhow::Result<()> {
+        let prefix = format!(
+            "pxboard-{}-{}-node-",
+            URL_SAFE_NO_PAD.encode(self.base.as_bytes()),
+            self.machine_id
+        );
+        let mut entries = fs::read_dir(std::env::current_dir()?).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            let Some(id) = name
+                .strip_prefix(&prefix)
+                .and_then(|name| name.strip_suffix("-traffic.json"))
+            else {
+                continue;
+            };
+            let id: i64 = id.parse().context("read pending PxBoard outbox node id")?;
+            match self.traffic(id, HashMap::new()).await {
+                Ok(()) => {}
+                Err(TrafficReportError::Definite(error) | TrafficReportError::Uncertain(error)) => {
+                    return Err(
+                        error.context("drain all source PxBoard traffic queues before migration")
+                    );
+                }
             }
         }
         Ok(())
