@@ -262,18 +262,19 @@ fn user_materials<'a>(
                     "decode Shadowsocks 2022 server_key",
                 )?
             } else {
-                shadowsocks_2022_user_key(
-                    users
-                        .first()
-                        .context("Shadowsocks 2022 node has no users")?,
-                    key_len,
-                )?
+                ensure!(
+                    users.len() == 1,
+                    "Shadowsocks 2022 ChaCha20 supports only a single user; use AES-128/AES-256 for Xboard multi-user nodes"
+                );
+                shadowsocks_2022_user_key(&users[0], key_len)?
             };
             let mut server_users = Vec::with_capacity(users.len());
             let mut core_users = Vec::with_capacity(users.len());
             for user in users {
                 let key = shadowsocks_2022_user_key(user, key_len)?;
-                server_users.push(format!("{}:{key}", user.id));
+                if uses_server_key {
+                    server_users.push(format!("{}:{key}", user.id));
+                }
                 core_users.push(UserMaterial {
                     user,
                     credential: key,

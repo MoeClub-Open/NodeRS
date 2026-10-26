@@ -302,7 +302,7 @@ fn shadowsocks_2022_uuid_keys_stay_stable_when_user_count_changes() {
 }
 
 #[test]
-fn shadowsocks_2022_chacha_uses_independent_user_keys_without_server_key() {
+fn shadowsocks_2022_chacha_supports_only_a_single_user() {
     let remote = NodeConfigResponse {
         server_port: 8388,
         cipher: "2022-blake3-chacha20-poly1305".into(),
@@ -319,22 +319,19 @@ fn shadowsocks_2022_chacha_uses_independent_user_keys_without_server_key() {
         panic!("expected Shadowsocks config");
     };
     assert_eq!(config.password, user.password);
-    assert_eq!(config.users, [format!("1001:{}", user.password)]);
+    assert!(config.users.is_empty());
+    let core_users = shadowsocks::core_users(&remote, std::slice::from_ref(&user)).unwrap();
+    assert_eq!(core_users[0].credential, user.password);
+    assert_eq!(core_users[0].id, "1001");
     let second_user = PanelUser {
         id: 1002,
         uuid: "b4593f99-797b-5b69-9237-aa0de075c8cf".into(),
         ..Default::default()
     };
     let users = [user, second_user];
-    let BuiltServerConfig::Shadowsocks(config) =
-        shadowsocks::build_config(&remote, &users).unwrap()
-    else {
-        panic!("expected Shadowsocks config");
-    };
-    assert_eq!(config.users.len(), 2);
-    let core_users = shadowsocks::core_users(&remote, &users).unwrap();
-    assert_ne!(core_users[0].credential, core_users[1].credential);
-    assert_eq!(core_users[1].id, "1002");
+    let error = shadowsocks::build_config(&remote, &users).err().unwrap();
+    assert!(error.to_string().contains("supports only a single user"));
+    assert!(shadowsocks::core_users(&remote, &users).is_err());
     assert!(shadowsocks::core_users(&remote, &[]).unwrap().is_empty());
 }
 

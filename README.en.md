@@ -40,7 +40,7 @@ NodeRS is a Linux node agent for [Xboard](https://github.com/cedar2025/Xboard). 
 
 Wire-level limits are documented in the [Aerion docs](https://github.com/MoeclubM/Aerion).
 
-SS-2022 AES-128, AES-256, and ChaCha20 support multiple users over TCP, UDP, and UoT, with per-user traffic accounting, rate limits, and device limits. User keys come from the panel's Base64 `password`, or from the first 16/32 bytes of the UUID encoded as Base64, matching Xboard. AES clients use `server_key:user_key`; ChaCha20 clients use their independent user key directly, regardless of user count.
+SS-2022 AES-128 and AES-256 support multiple users over TCP, UDP, and UoT, with per-user traffic accounting, rate limits, and device limits. User keys come from the panel's Base64 `password`, or from the first 16/32 bytes of the UUID encoded as Base64, matching Xboard. AES clients always use `server_key:user_key`, regardless of user count. ChaCha20 supports a single user only; use AES for Xboard multi-user nodes, matching the official node's support.
 
 ## Quick Start
 

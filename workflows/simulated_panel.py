@@ -143,10 +143,7 @@ SS_USER_KEYS = {
     user["id"]: base64.b64encode(user["uuid"].encode()[:16 if SS_CIPHER == "2022-blake3-aes-128-gcm" else 32]).decode()
     for user in DEFAULT_USERS
 }
-SS_CLIENT_PASSWORD = (
-    SS_USER_KEYS[1001] if SS_CIPHER == "2022-blake3-chacha20-poly1305"
-    else f"{SS_SERVER_KEY}:{SS_USER_KEYS[1001]}"
-)
+SS_CLIENT_PASSWORD = f"{SS_SERVER_KEY}:{SS_USER_KEYS[1001]}"
 
 
 class PanelHandler(BaseHTTPRequestHandler):
