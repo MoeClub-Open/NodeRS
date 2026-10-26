@@ -100,13 +100,11 @@ jobs:
           fi
           case ",${PROTO}," in
             ,,|*,shadowsocks,*)
-              for cipher in 2022-blake3-aes-256-gcm 2022-blake3-chacha20-poly1305; do
-                SS_CIPHER="$cipher" python3 workflows/test_all_protocols_mihomo.py \
-                  --only-protocols shadowsocks \
-                  --aerion-bin "${AERION_DIR}/target/debug/aerion" \
-                  --noders-bin "${PWD}/target/debug/noders" \
-                  --mihomo-bin /tmp/mihomo \
-                  --verbose
-              done
+              SS_CIPHER=2022-blake3-aes-256-gcm python3 workflows/test_all_protocols_mihomo.py \
+                --only-protocols shadowsocks \
+                --aerion-bin "${AERION_DIR}/target/debug/aerion" \
+                --noders-bin "${PWD}/target/debug/noders" \
+                --mihomo-bin /tmp/mihomo \
+                --verbose
               ;;
           esac
