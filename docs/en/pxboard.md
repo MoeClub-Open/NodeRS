@@ -4,11 +4,11 @@
 
 NodeRS connects to PxBoard through its nodes plugin. The local `type` setting selects the panel API and authentication method.
 
-This integration is distributed by the `MoeClub-Open/NodeRS` organization fork under the original author's MIT license. Release tag `v0.1.49-pxboard.1` uses executable version `0.1.49`.
+Starting with `v0.1.49`, official NodeRS packages support both Xboard and PxBoard. Xboard remains the default panel type.
 
 ## Panel Setup
 
-Use PxBoard core 0.2.0 or later with access and nodes plugins 1.1.0 or later. Client configuration exports also require the subscriptions plugin.
+Use the current `0.0.1` PxBoard core and matching access-account and node-management plugins. Plugin manifests define the required version epoch. Client configuration export also requires the subscriptions plugin.
 
 Create a machine in the administration panel and obtain its machine number and key. Create nodes with the `NodeRS` engine, assign the machine, and configure their protocol, address, ports, and certificates. Users need active access accounts, available quota, and permission to use the node's groups.
 
@@ -19,7 +19,7 @@ One machine can host multiple nodes. Machine and node numbers are separate ident
 Both the executable and installer must support PxBoard. From an extracted release bundle:
 
 ```bash
-bash install.sh --version v0.1.49-pxboard.1 --panel-type pxboard \
+bash install.sh --version v0.1.49 --panel-type pxboard \
   --api https://panel.example.com \
   --key MACHINE_KEY \
   --machine-id 1
@@ -30,12 +30,12 @@ Use `install-openrc.sh` on OpenRC systems. From a source checkout, run `bash scr
 To download the installer and pin the release:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
-  --version v0.1.49-pxboard.1 --panel-type pxboard \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+  --version v0.1.49 --panel-type pxboard \
   --api https://panel.example.com --key MACHINE_KEY --machine-id 1
 ```
 
-The default release repository is `MoeClub-Open/NodeRS`. To use another repository, set `NODERS_REPOSITORY=owner/repo` on the `bash` command and provide the same override on later upgrade commands.
+The default release repository is `MoeclubM/NodeRS`. To use another repository, set `NODERS_REPOSITORY=owner/repo` on the `bash` command and provide the same override on later upgrade commands.
 
 Check executable capabilities with:
 

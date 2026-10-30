@@ -399,7 +399,7 @@ Commands:
 
 Environment:
   NODERS_REPOSITORY
-      Override the release repository used by update/install (default: MoeClub-Open/NodeRS).
+      Override the release repository used by update/install (default: MoeclubM/NodeRS).
 
 Selectors:
   - Full service name, for example: noders-1-123456789

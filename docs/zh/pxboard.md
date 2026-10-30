@@ -4,11 +4,11 @@
 
 NodeRS 通过 PxBoard 的节点插件对接机器。PxBoard 使用自己的 API 和认证方式；本地配置中的 `type` 决定使用哪一组接口。
 
-此功能由 `MoeClub-Open/NodeRS` 组织分支提供，保留原作者的 MIT 许可。发布标签 `v0.1.49-pxboard.1` 使用程序版本 `0.1.49`。
+从 `v0.1.49` 起，NodeRS 正式发布包同时支持 Xboard 与 PxBoard，默认对接类型仍为 Xboard。
 
 ## 面板准备
 
-需要 PxBoard 核心 0.2.0 或更新版本，以及 1.1.0 或更新版本的访问账户、节点管理插件。用于导出客户端配置时还需要订阅插件。
+使用当前 `0.0.1` PxBoard 核心，以及同版本的访问账户、节点管理插件；版本序列要求以插件声明为准。用于导出客户端配置时还需要订阅插件。
 
 在管理后台的“机器”中创建机器，取得机器编号与接入密钥。添加节点时选择 `NodeRS`，指定所属机器，填写协议、服务器地址、端口与证书。用户需要有正常的访问账户、剩余流量和对应节点分组权限。
 
@@ -19,7 +19,7 @@ NodeRS 通过 PxBoard 的节点插件对接机器。PxBoard 使用自己的 API 
 安装包中的程序和安装脚本都必须包含 PxBoard 支持。在已解压的安装包目录运行：
 
 ```bash
-bash install.sh --version v0.1.49-pxboard.1 --panel-type pxboard \
+bash install.sh --version v0.1.49 --panel-type pxboard \
   --api https://panel.example.com \
   --key 机器接入密钥 \
   --machine-id 1
@@ -30,12 +30,12 @@ OpenRC 系统将脚本名换成 `install-openrc.sh`。从源码目录运行时�
 直接下载安装脚本时可固定此发布标签：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
-  --version v0.1.49-pxboard.1 --panel-type pxboard \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+  --version v0.1.49 --panel-type pxboard \
   --api https://panel.example.com --key 机器接入密钥 --machine-id 1
 ```
 
-默认发布源为 `MoeClub-Open/NodeRS`。使用其他发布仓库时，在 `bash` 命令前设置 `NODERS_REPOSITORY=owner/repo`，后续升级命令也需显式提供相同覆盖值。
+默认发布源为 `MoeclubM/NodeRS`。使用其他发布仓库时，在 `bash` 命令前设置 `NODERS_REPOSITORY=owner/repo`，后续升级命令也需显式提供相同覆盖值。
 
 程序本身可以检查支持的面板类型：
 

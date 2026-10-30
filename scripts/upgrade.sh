@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPOSITORY="${NODERS_REPOSITORY:-MoeClub-Open/NodeRS}"
+REPOSITORY="${NODERS_REPOSITORY:-MoeclubM/NodeRS}"
 SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 COMMON_LIB_PATH="$SCRIPT_DIR/lib/install-common.sh"
 PREFIX="/usr/local"
@@ -52,7 +52,7 @@ Options:
   -h, --help            Show this help message
 
 Environment:
-  NODERS_REPOSITORY     Release repository, default: MoeClub-Open/NodeRS
+  NODERS_REPOSITORY     Release repository, default: MoeclubM/NodeRS
 
 Examples:
   bash upgrade.sh

@@ -18,7 +18,7 @@ NodeRS 只在 Linux 上运行。安装脚本会识别 `x86_64` / `aarch64` 以�
 ## 一键安装
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key 机器密钥 \
   --machine-id 1
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 OpenRC：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install-openrc.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install-openrc.sh | bash -s -- \
   --api https://api.example.com \
   --key 机器密钥 \
   --machine-id 1
@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 同一台服务器对接多个面板时，重复 `--machine <url> <key> <id>`；不同 API 可以共用同一个 `machine_id`，实例名由 `api + machine_id` 哈希生成，不会冲突：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --machine https://secapi.example.com 密钥A 10 \
   --machine https://api.example.com 密钥B 10
 ```
@@ -61,15 +61,25 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 
 脚本直接从仓库或 raw URL 运行时会自动下载 Release 包；如果已经在解压好的 Release 包内运行，则直接使用本地文件，不再下载。
 
-安装和升级默认从 `MoeClub-Open/NodeRS` 获取发布包，可用环境变量 `NODERS_REPOSITORY` 为本次命令指定其他 `owner/repo`。例如：
+安装和升级默认从 `MoeclubM/NodeRS` 获取发布包，可用环境变量 `NODERS_REPOSITORY` 为本次命令指定其他 `owner/repo`。例如：
 
 ```bash
-NODERS_REPOSITORY=owner/NodeRS bash scripts/install.sh --version v0.1.49-pxboard.1 \
+NODERS_REPOSITORY=owner/NodeRS bash scripts/install.sh --version v0.1.49 \
   --panel-type pxboard --api https://panel.example.com --key 机器密钥 --machine-id 1
-NODERS_REPOSITORY=owner/NodeRS noders update --version v0.1.49-pxboard.1
+NODERS_REPOSITORY=owner/NodeRS noders update --version v0.1.49
 ```
 
-覆盖发布源不会修改对接类型，也不会自动保存为之后命令的默认值。PxBoard 实例仍要求下载的程序支持 PxBoard。标签 `v0.1.49-pxboard.1` 的程序版本显示为 `0.1.49`。
+覆盖发布源只影响本次命令，不修改对接类型。安装或升级后，管理脚本使用新包中的默认发布源；PxBoard 实例仍要求下载的程序支持 PxBoard。
+
+### 从组织适配版升级
+
+此前从 `MoeClub-Open/NodeRS` 安装的 `v0.1.49-pxboard.1` 或 `.2`，使用原仓库完成一次升级：
+
+```bash
+NODERS_REPOSITORY=MoeclubM/NodeRS noders update --version v0.1.49
+```
+
+升级保留面板连接配置、证书和流量队列，并将后续更新切回原仓库。之后直接执行 `noders update` 即可。
 
 ## 本地配置文件
 
@@ -94,7 +104,7 @@ machine_id = 1
 需要 Rust（edition 2024，建议最新 stable）：
 
 ```bash
-git clone --branch codex/pxboard-support https://github.com/MoeClub-Open/NodeRS.git
+git clone https://github.com/MoeclubM/NodeRS.git
 cd NodeRS
 cargo build --release
 ```
@@ -108,14 +118,14 @@ cargo build --release
 ```bash
 noders update
 # 指定版本 / 升级后不重启
-noders update --version v0.1.49-pxboard.1
+noders update --version v0.1.49
 noders update --no-restart
 ```
 
 或使用脚本（会保留机器配置、证书、ACME 账号和状态；旧的 `noders-anytls`、`noders-<machine_id>` 命名会先迁移到当前实例名再换二进制）：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/upgrade.sh | bash -s --
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/upgrade.sh | bash -s --
 ```
 
 ## 卸载
@@ -123,7 +133,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 按 `machine_id` 删除该机器在本机的全部 Xboard 实例；PxBoard 增加 `--panel-type pxboard`：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --uninstall \
   --machine-id 1
 ```
@@ -131,7 +141,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 多个 API 共用同一个 `machine_id` 时，带上原来的 `--machine <url> <key> <id>` 只删那一个实例：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --uninstall \
   --machine https://api.example.com 机器密钥 1
 ```
@@ -139,7 +149,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 清空本机 NodeRS：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --uninstall \
   --all
 ```

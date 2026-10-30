@@ -53,4 +53,4 @@ tail -f /var/log/noders/noders-1-123456789.log   # OpenRC
 
 Linux only：`x86_64` / `aarch64`，glibc 2.36+ 或 musl。systemd 与 OpenRC 都有对应安装脚本。不支持 Windows / macOS。
 
-还有其他问题：先翻 [Aerion 文档](https://github.com/MoeclubM/Aerion)（协议层限制），或在 [GitHub Issues](https://github.com/MoeClub-Open/NodeRS/issues) 提问。
+还有其他问题：先翻 [Aerion 文档](https://github.com/MoeclubM/Aerion)（协议层限制），或在 [GitHub Issues](https://github.com/MoeclubM/NodeRS/issues) 提问。

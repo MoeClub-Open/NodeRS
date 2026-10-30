@@ -10,11 +10,9 @@ English | [简体中文](README.md)
 
 NodeRS is a Linux node agent for Xboard and PxBoard. Nodes, users, listen ports, and certificates are provisioned from the panel. The local configuration contains the panel type, API address, machine key, and `machine_id`. Protocols are served by [Aerion](https://github.com/MoeclubM/Aerion), the same implementation behind [XBClient](https://github.com/MoeclubM/XBClient).
 
-This organization fork of [MoeclubM/NodeRS](https://github.com/MoeclubM/NodeRS) adds native PxBoard integration while keeping Xboard as the default. Releases are downloaded from `MoeClub-Open/NodeRS`; tag `v0.1.49-pxboard.1` identifies executable version `0.1.49`. The original author's MIT license and copyright notice are preserved.
-
-[![Release](https://img.shields.io/github/v/release/MoeClub-Open/NodeRS?style=flat-square)](https://github.com/MoeClub-Open/NodeRS/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/MoeClub-Open/NodeRS/ci.yml?style=flat-square&label=CI)](https://github.com/MoeClub-Open/NodeRS/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/MoeClub-Open/NodeRS?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/MoeclubM/NodeRS?style=flat-square)](https://github.com/MoeclubM/NodeRS/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/MoeclubM/NodeRS/ci.yml?style=flat-square&label=CI)](https://github.com/MoeclubM/NodeRS/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/MoeclubM/NodeRS?style=flat-square)](LICENSE)
 
 ## Features
 
@@ -50,7 +48,7 @@ SS-2022 AES-128 and AES-256 support multiple users over TCP, UDP, and UoT, with 
 Create a machine in Xboard and note the machine ID and machine key. Attach your nodes to it and configure ports, protocols, and certificates, then run this on the server:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key MACHINE_KEY \
   --machine-id 1
@@ -61,8 +59,8 @@ On Alpine or other non-systemd distros, use [install-openrc.sh](scripts/install-
 For PxBoard, obtain the machine number and key from its Machines page, then install a PxBoard-capable NodeRS bundle:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
-  --version v0.1.49-pxboard.1 --panel-type pxboard \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+  --version v0.1.49 --panel-type pxboard \
   --api https://panel.example.com --key MACHINE_KEY --machine-id 1
 ```
 

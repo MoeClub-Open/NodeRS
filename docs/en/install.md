@@ -18,7 +18,7 @@ Xboard is the default panel type. For PxBoard, add `--panel-type pxboard` and us
 ## One-command Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key MACHINE_KEY \
   --machine-id 1
@@ -27,7 +27,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 OpenRC:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install-openrc.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install-openrc.sh | bash -s -- \
   --api https://api.example.com \
   --key MACHINE_KEY \
   --machine-id 1
@@ -36,7 +36,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 To connect one server to multiple panels, repeat `--machine <url> <key> <id>`; different APIs may share the same `machine_id` because instance names are derived from an `api + machine_id` hash:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --machine https://secapi.example.com KEY_A 10 \
   --machine https://api.example.com KEY_B 10
 ```
@@ -61,15 +61,25 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 
 When run from the repo or a raw URL the script downloads the release bundle automatically; when run inside an already-unpacked release bundle it installs from local files without downloading.
 
-Install and upgrade download releases from `MoeClub-Open/NodeRS` by default. Set `NODERS_REPOSITORY` to a different `owner/repo` for an individual command:
+Install and upgrade download releases from `MoeclubM/NodeRS` by default. Set `NODERS_REPOSITORY` to a different `owner/repo` for an individual command:
 
 ```bash
-NODERS_REPOSITORY=owner/NodeRS bash scripts/install.sh --version v0.1.49-pxboard.1 \
+NODERS_REPOSITORY=owner/NodeRS bash scripts/install.sh --version v0.1.49 \
   --panel-type pxboard --api https://panel.example.com --key MACHINE_KEY --machine-id 1
-NODERS_REPOSITORY=owner/NodeRS noders update --version v0.1.49-pxboard.1
+NODERS_REPOSITORY=owner/NodeRS noders update --version v0.1.49
 ```
 
-The override changes the release source for that command; it does not change the panel type or persist a new default. PxBoard instances still require a PxBoard-capable executable. Release tag `v0.1.49-pxboard.1` reports executable version `0.1.49`.
+The override selects the release source for that command without changing the panel type. After installation or upgrade, management scripts use the default source from the new package. PxBoard instances still require a PxBoard-capable executable.
+
+### Upgrade from the organization builds
+
+For `v0.1.49-pxboard.1` or `.2` installed from `MoeClub-Open/NodeRS`, run one upgrade against the original repository:
+
+```bash
+NODERS_REPOSITORY=MoeclubM/NodeRS noders update --version v0.1.49
+```
+
+This preserves panel connection settings, certificates, and traffic queues while switching future updates to the original repository. Subsequent upgrades can use `noders update` directly.
 
 ## Local Config File
 
@@ -94,7 +104,7 @@ The daemon is started as `noders <config path>` (falling back to `config.toml` i
 Requires Rust (edition 2024, latest stable recommended):
 
 ```bash
-git clone --branch codex/pxboard-support https://github.com/MoeClub-Open/NodeRS.git
+git clone https://github.com/MoeclubM/NodeRS.git
 cd NodeRS
 cargo build --release
 ```
@@ -108,14 +118,14 @@ Upgrade to the latest release with the management command:
 ```bash
 noders update
 # pin a version / skip restarting afterwards
-noders update --version v0.1.49-pxboard.1
+noders update --version v0.1.49
 noders update --no-restart
 ```
 
 Or with the script (machine configs, certificates, ACME accounts, and state are preserved; legacy `noders-anytls` binaries and `noders-<machine_id>` names are migrated to the current instance names before the binary is swapped):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/upgrade.sh | bash -s --
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/upgrade.sh | bash -s --
 ```
 
 ## Uninstall
@@ -123,7 +133,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 Remove every local Xboard instance of a machine by `machine_id`; add `--panel-type pxboard` to target PxBoard:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --uninstall \
   --machine-id 1
 ```
@@ -131,7 +141,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 When several APIs share the same `machine_id`, pass the original `--machine <url> <key> <id>` to remove just that one instance:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --uninstall \
   --machine https://api.example.com MACHINE_KEY 1
 ```
@@ -139,7 +149,7 @@ curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-s
 Wipe NodeRS from this host:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --uninstall \
   --all
 ```

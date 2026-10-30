@@ -4,11 +4,9 @@
 
 NodeRS 是跑在 Linux 上的 Xboard / PxBoard 节点端。在服务器上执行一条命令接入面板，之后节点、用户、监听端口、证书全部由面板下发，本机只保留对接类型、API 地址、机器密钥和 `machine_id`。协议由 [Aerion](https://github.com/MoeclubM/Aerion) 提供，与 [XBClient](https://github.com/MoeclubM/XBClient) 共用同一套实现。
 
-本仓库是 [MoeclubM/NodeRS](https://github.com/MoeclubM/NodeRS) 的组织分支，增加 PxBoard 原生对接，默认仍为 Xboard。发布源为 `MoeClub-Open/NodeRS`；`v0.1.49-pxboard.1` 对应程序版本 `0.1.49`。保留原作者 MoeclubM 的 MIT 许可与版权声明。
-
-[![Release](https://img.shields.io/github/v/release/MoeClub-Open/NodeRS?style=flat-square)](https://github.com/MoeClub-Open/NodeRS/releases)
-[![CI](https://img.shields.io/github/actions/workflow/status/MoeClub-Open/NodeRS/ci.yml?style=flat-square&label=CI)](https://github.com/MoeClub-Open/NodeRS/actions/workflows/ci.yml)
-[![License](https://img.shields.io/github/license/MoeClub-Open/NodeRS?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/MoeclubM/NodeRS?style=flat-square)](https://github.com/MoeclubM/NodeRS/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/MoeclubM/NodeRS/ci.yml?style=flat-square&label=CI)](https://github.com/MoeclubM/NodeRS/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/MoeclubM/NodeRS?style=flat-square)](LICENSE)
 
 ## 特性
 
@@ -45,7 +43,7 @@ SS-2022 的 AES-128、AES-256 支持 TCP、UDP 和 UoT 多用户，按用户统�
 在 Xboard 里创建机器，记下机器 ID 和机器密钥，把节点挂到这台机器上并配好端口、协议、证书，然后在服务器上执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
   --api https://api.example.com \
   --key 机器密钥 \
   --machine-id 1
@@ -56,8 +54,8 @@ Alpine 等没有 systemd 的系统用 [install-openrc.sh](scripts/install-openrc
 对接 PxBoard 时先在“机器”中取得机器编号与密钥，再安装支持 PxBoard 的 NodeRS 包：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MoeClub-Open/NodeRS/codex/pxboard-support/scripts/install.sh | bash -s -- \
-  --version v0.1.49-pxboard.1 --panel-type pxboard \
+curl -fsSL https://raw.githubusercontent.com/MoeclubM/NodeRS/main/scripts/install.sh | bash -s -- \
+  --version v0.1.49 --panel-type pxboard \
   --api https://panel.example.com --key 机器密钥 --machine-id 1
 ```
 
